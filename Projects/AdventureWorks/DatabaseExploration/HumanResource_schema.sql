@@ -2,8 +2,9 @@ SELECT DISTINCT TABLE_SCHEMA FROM INFORMATION_SCHEMA.TABLES
 
 
 
-
--- EXPLORE SCHEMA HumanResources
+---------------------------------------------------
+-------- EXPLORE SCHEMA HumanResources ------------
+---------------------------------------------------
 SELECT * FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_SCHEMA = 'HumanResources'
 ORDER BY TABLE_NAME
