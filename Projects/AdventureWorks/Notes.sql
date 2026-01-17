@@ -6,6 +6,23 @@ select
 
 
 
+-- 0. ORDER BY with CASE WHEN
+select 
+	BusinessEntityID,
+	LastName,
+	TerritoryName,
+	CountryRegionName
+from Sales.vSalesPerson
+order by 
+	case CountryRegionName
+		when 'United States' THEN TerritoryName
+	end asc,
+	case 
+		when CountryRegionName <> 'United States' THEN CountryRegionName
+	end desc
+
+
+
 
 -- 1. SKIP 0 AND TAKE 20
 select 
@@ -48,6 +65,7 @@ inner join Person.EmailAddress a on a.BusinessEntityID = p.BusinessEntityID
 
 
 
+
 -- 5. TRIM, LTRIM, RTRIM
 -- TRIM CAN BE USED TO REMOVE (SPACE/SPECIFIC CHARACTERS) BETWEEN STRING
 -- 67:
@@ -57,6 +75,7 @@ select
 	LTRIM(ProductNumber, 'HN') as _ltrim -- REMOVE LEFT SUBSTRING 'HN'
 from Production.Product
 where ProductNumber like 'HN%'
+
 
 
 
@@ -74,6 +93,7 @@ select @r + @s
 
 
 
+
 -- 7. CASE-SENSITIVE TEXT SEARCH
 select
 	productnumber,
@@ -83,9 +103,11 @@ where name COLLATE Latin1_General_CS_AS like '%[SML]'
 
 
 
+
 -- 8. AGGREGATE FUNCTION VAR, VARP
 -- var is used to calculate sample variance
 -- varp is used to calculate population variance
+
 
 
 
@@ -126,9 +148,19 @@ GROUP BY GROUPING SETS (CUBE(locationid, shelf), ROLLUP (locationid, shelf), (lo
 
 
 
+
 -- 10: how to convert a current datetime to the beginning and the end of the date
 DECLARE @current_date Smalldatetime = GETDATE();
 select
 	@current_date as [current_date],
 	CAST(CAST(@current_date AS date) AS smalldatetime) as beginning_date,
 	DATEADD(MINUTE, -1, DATEADD(DAY, 1, DATEDIFF(DAY, 0, @current_date))) as end_date
+
+
+
+-- 11: Covert datetime to a specific time zone
+select
+	SalesOrderID,
+	OrderDate,
+	OrderDate AT TIME ZONE 'Alaskan Standard Time' AT TIME ZONE 'Mountain Standard Time (Mexico)' AS [Alaskan time -> Mountain (Mexico)]
+from Sales.SalesOrderHeader

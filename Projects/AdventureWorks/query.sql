@@ -1,4 +1,4 @@
--- hierarchyid data type represent the level of nodes inside a tree-like hierarchy
+﻿-- hierarchyid data type represent the level of nodes inside a tree-like hierarchy
 -- The value is stored as binary/hexadecimal -> to view its path use ToString() method
 -- 1
 SELECT 
@@ -911,3 +911,587 @@ WHERE
 -- Ordering the result set by BusinessEntityID
 ORDER BY 
     BusinessEntityID
+
+
+
+-- 121:
+select 
+	ROW_NUMBER() over(order by SalesYTD desc) as rn,
+	FirstName,
+	LastName,
+	ROUND(SalesYTD, -2)
+from sales.vSalesPerson
+
+
+-- 122:
+select 
+	SalesOrderID,
+	OrderDate,
+	ROW_NUMBER() over(order by OrderDate)
+from Sales.SalesOrderHeader
+order by OrderDate
+offset 49 rows
+fetch next 11 rows only
+
+
+-- 123:
+select
+	FirstName,
+	LastName,
+	TerritoryName,
+	SalesYTD,
+	ROW_NUMBER() over(partition by TerritoryName order by SalesYTD)
+from sales.vSalesPerson
+
+
+-- 124:
+select 
+	BusinessEntityID,
+	LastName,
+	TerritoryName,
+	CountryRegionName
+from Sales.vSalesPerson
+order by 
+	case CountryRegionName
+		when 'United States' THEN TerritoryName
+	end asc,
+	case 
+		when CountryRegionName <> 'United States' THEN CountryRegionName
+	end desc
+
+
+
+
+-- 125:
+select 
+	e.JobTitle,
+	max(h.Rate) as highestHourlywage
+from HumanResources.Employee e
+inner hash join HumanResources.EmployeePayHistory h on h.BusinessEntityID = e.BusinessEntityID
+where (e.Gender = 'M' and h.Rate > 40) OR (e.Gender = 'F' and h.Rate > 42)
+group by e.JobTitle
+order by max(h.rate) desc
+
+
+-- 126:
+select 
+	BusinessEntityID,
+	SalariedFlag
+from HumanResources.Employee
+order by  
+	case SalariedFlag
+		when 1 then BusinessEntityID 
+	end desc,
+	case SalariedFlag
+		when 0 then BusinessEntityID
+	end asc
+
+
+-- 127:
+select
+	ProductNumber,
+	Name,
+	ListPrice
+from production.Product
+order by ProductNumber asc
+
+
+-- 128:
+select 
+	ProductNumber,
+	ProductLine,
+	Name
+from Production.Product
+
+
+-- 129:
+select
+	ProductID,
+	MakeFlag,
+	FinishedGoodsFlag,
+	case
+		when MakeFlag = FinishedGoodsFlag then null
+		else MakeFlag
+	end as makeflag
+from Production.Product
+where ProductID < 10
+
+
+-- 130:
+select 
+	Name,
+	Class,
+	Color,
+	ProductNumber,
+	COALESCE(Class, Color, ProductNumber) AS firstnotnull
+from Production.Product 
+
+
+-- 131:
+select 
+	ProductID,
+	MakeFlag,
+	FinishedGoodsFlag,
+	NULLIF(MakeFlag, FinishedGoodsFlag) AS [Null if equal]
+from Production.Product
+where ProductID < 10
+
+
+-- 132: lấy ra những sản phẩm đã được đặt hàng
+SELECT ProductID
+FROM Production.Product
+INTERSECT 
+select ProductID
+from Production.WorkOrder
+order by ProductID
+
+
+-- 133: lấy ra những sản phẩm chưa được đặt hàng
+select ProductID
+from Production.Product
+EXCEPT
+select productID
+from Production.WorkOrder
+order by ProductID
+
+
+-- 134:
+select productID
+from Production.WorkOrder
+EXCEPT
+select ProductID
+from Production.Product
+order by ProductID
+
+
+
+-- 135:
+select 
+	BusinessEntityID
+from Person.BusinessEntity
+INTERSECT
+select 
+	BusinessEntityID
+from Person.Person
+order by BusinessEntityID
+
+
+-- 138:
+select
+	p.FirstName,
+	p.LastName,
+	e.VacationHours,
+	e.SickLeaveHours,
+	e.VacationHours + e.SickLeaveHours as [Total hours away]
+from HumanResources.Employee e
+inner join Person.Person p on p.BusinessEntityID = e.BusinessEntityID
+order by [Total hours away] ASC
+
+
+
+-- 139:
+select 
+	MAX(TaxRate) - MIN(TaxRate) AS [Tax Rate Difference]
+from sales.SalesTaxRate
+
+
+
+-- 140:
+select 
+	s.BusinessEntityID as personid,
+	p.FirstName,
+	p.LastName,
+	s.SalesQuota,
+	s.SalesQuota / 12 as [Sales Target Per Month]
+from Sales.SalesPerson s
+inner join HumanResources.Employee e on e.BusinessEntityID = s.BusinessEntityID
+inner join Person.Person p on p.BusinessEntityID = s.BusinessEntityID
+
+
+
+-- 141:
+select 
+	ProductID,
+	UnitPrice,
+	OrderQty,
+	cast(UnitPrice as int) % OrderQty as modulo
+from sales.SalesOrderDetail
+
+
+
+-- 143:
+select
+	e.FirstName,
+	e.LastName,
+	p.Rate
+from HumanResources.vEmployee e
+inner join HumanResources.EmployeePayHistory p ON e.BusinessEntityID = p.BusinessEntityID
+where p.Rate NOT BETWEEN 27 and 30
+
+
+
+-- 144:
+select
+	BusinessEntityID,
+	RateChangeDate
+from HumanResources.EmployeePayHistory
+where RateChangeDate between '20111212' and '20120105'
+order by RateChangeDate asc
+
+
+
+-- 145:
+select DepartmentID, Name
+from HumanResources.Department
+where exists (select null)
+order by name asc
+
+
+
+-- 147:
+select s.Name
+from Sales.Store s
+where s.Name IN (select distinct Name from Purchasing.Vendor)
+
+
+-- 148:
+select 
+	p.FirstName,
+	p.LastName,
+	e.JobTitle
+from HumanResources.EmployeeDepartmentHistory h
+INNER JOIN HumanResources.Employee e ON e.BusinessEntityID = h.BusinessEntityID
+INNER JOIN Person.Person p ON p.BusinessEntityID = e.BusinessEntityID
+where h.DepartmentID IN (select DepartmentID from HumanResources.Department where Name LIKE 'P%')
+	AND h.EndDate IS NULL
+
+
+-- 149:
+select 
+	p.FirstName,
+	p.LastName,
+	e.JobTitle
+from HumanResources.EmployeeDepartmentHistory h
+INNER JOIN HumanResources.Employee e ON e.BusinessEntityID = h.BusinessEntityID
+INNER JOIN Person.Person p ON p.BusinessEntityID = e.BusinessEntityID
+where h.DepartmentID NOT IN (select DepartmentID from HumanResources.Department where Name LIKE 'P%')
+	AND h.EndDate IS NULL
+
+
+-- 150:
+select 
+	p.FirstName,
+	p.LastName,
+	e.JobTitle
+from Person.Person p
+inner join HumanResources.Employee e ON e.BusinessEntityID = p.BusinessEntityID
+where e.JobTitle IN ('Design Engineer', 'Tool Designer', 'Marketing Assistant')
+
+
+-- 151:
+select
+	p.FirstName,
+	p.LastName
+from Person.Person p
+INNER JOIN Sales.SalesPerson s ON s.BusinessEntityID = p.BusinessEntityID
+where s.SalesQuota > 250000
+
+
+-- 156:
+select *
+from Production.Product
+where Color = 'Silver' AND StandardCost <= 400 AND ProductNumber LIKE 'BK-%'
+
+
+-- 157:
+select
+	FirstName,
+	LastName,
+	Department,
+	Shift
+from HumanResources.vEmployeeDepartmentHistory
+where Department = 'Quality Assurance' and Shift IN ('Night', 'Evening')
+
+
+-- 158:
+select 
+	FirstName, LastName,
+	LEN(firstName) AS [len],
+	DATALENGTH(FirstName) AS [DataLength]
+from Person.Person
+where LEN(FirstName) = 3 AND FirstName LIKE '%an'
+;
+select 
+	FirstName,
+	LastName
+from Person.Person
+where FirstName LIKE '_an'
+
+
+-- 159:
+select * from sys.time_zone_info
+;
+select
+	SalesOrderID,
+	OrderDate,
+	OrderDate AT TIME ZONE 'Alaskan Standard Time' AS [Alaskan time]
+from Sales.SalesOrderHeader
+
+
+-- 160:
+select
+	SalesOrderID,
+	OrderDate,
+	OrderDate AT TIME ZONE 'Alaskan Standard Time' AT TIME ZONE 'Mountain Standard Time (Mexico)' AS [Alaskan time -> Mountain (Mexico)]
+from Sales.SalesOrderHeader
+
+
+
+-- 161:
+select 
+	ProductPhotoID,
+	ThumbnailPhoto,
+	*
+from Production.ProductPhoto
+where LargePhotoFileName LIKE '%greena_%' ESCAPE 'a'
+
+
+
+-- 162:
+select 
+	a.AddressLine1,
+	a.AddressLine2,
+	a.City,
+	a.PostalCode,
+	s.CountryRegionCode
+from Person.Address a
+inner join Person.StateProvince s ON s.StateProvinceID = a.StateProvinceID
+where a.City LIKE 'PA%' AND s.CountryRegionCode <> 'US'
+
+
+
+-- 163:
+select
+	p.ProductID,
+	p.Name,
+	p.Color
+from Production.Product p
+inner join (
+	VALUES('Blade'), ('Crown Race'), ('AWC Logo Cap')
+) AS temp(name) ON temp.name = p.Name
+
+
+
+-- 165:
+select 
+	e.BusinessEntityID,
+	d.DepartmentID
+from HumanResources.Employee e
+CROSS JOIN HumanResources.Department d
+order by BusinessEntityID, DepartmentID
+
+
+
+-- 168:
+select
+	t.TerritoryID,
+	t.CountryRegionCode,
+	h.SalesOrderID
+from sales.SalesTerritory t
+left join sales.SalesOrderHeader h on h.TerritoryID = t.TerritoryID
+order by SalesOrderID ASC
+
+
+
+-- 169:
+select
+	t.TerritoryID,
+	t.CountryRegionCode,
+	h.SalesOrderID
+from sales.SalesTerritory t
+full outer join sales.SalesOrderHeader h on h.TerritoryID = t.TerritoryID
+order by SalesOrderID ASC
+
+
+
+-- 172:
+SELECT businessentityid, persontype, firstname, middlename, lastname
+FROM person.person
+WHERE firstname IS DISTINCT FROM 'Adam'
+ORDER BY firstname
+;
+SELECT businessentityid, persontype, firstname, middlename, lastname
+FROM person.person
+WHERE firstname <> 'Adam'
+ORDER BY firstname
+;
+SELECT businessentityid, persontype, firstname, middlename, lastname
+FROM person.person
+WHERE MiddleName IS DISTINCT FROM 'Francesca'
+ORDER BY firstname
+;
+SELECT businessentityid, persontype, firstname, middlename, lastname
+FROM person.person
+WHERE MiddleName <> 'Francesca'
+ORDER BY firstname
+;
+select 'a'
+WHERE 'a' <> NULL
+;
+select 'a'
+WHERE 'a' IS DISTINCT FROM NULL
+
+
+-- 173:
+SELECT businessentityid, persontype, firstname, middlename, lastname
+FROM person.person
+WHERE firstname IS NOT DISTINCT FROM 'Adam'
+ORDER BY firstname
+;
+SELECT businessentityid, persontype, firstname, middlename, lastname
+FROM person.person
+WHERE firstname = 'Adam'
+ORDER BY firstname
+
+
+-- 174:
+SELECT businessentityid, persontype, firstname, middlename, lastname
+FROM person.person
+WHERE MiddleName IS DISTINCT FROM NULL
+ORDER BY firstname
+;
+SELECT businessentityid, persontype, firstname, middlename, lastname
+FROM person.person
+WHERE MiddleName IS NOT NULL
+ORDER BY firstname
+
+
+-- 176:
+select Name, Weight, Color
+from Production.Product
+where Weight < 10 OR Color IS NOT DISTINCT FROM NULL
+
+
+
+-- 177:
+select BusinessEntityID, 
+	SalesYTD, 
+	CAST(SalesYTD as varchar) as moneydisplaystyle1, 
+	GETDATE(),
+	CONVERT(VARCHAR, GETDATE(), 126),
+	FORMAT(GETDATE(), 'yyyy-MM-dd HH:mm:ss')
+from sales.SalesPerson
+where cast(SalesYTD as VARCHAR) LIKE '1%'
+
+
+-- 178:
+select
+	d.Name,
+	case
+		when GROUPING(d.Name) = 0 AND GROUPING(e.JobTitle) = 0 then e.JobTitle
+		WHEN GROUPING(d.Name) = 0 AND GROUPING(e.JobTitle) = 1 then concat('Total: ', d.Name)
+		ELSE 'Total'
+	end as [Job Title],
+	COUNT(*) AS Employee_count
+from HumanResources.Employee e
+inner join HumanResources.EmployeeDepartmentHistory h on h.BusinessEntityID = e.BusinessEntityID
+INNER JOIN HumanResources.Department d ON d.DepartmentID = h.DepartmentID
+where d.DepartmentID IN (12, 14)
+group by ROLLUP(d.Name, e.JobTitle)
+
+
+-- 181:
+select
+	QuotaDate,
+	DATEPART(QUARTER, QuotaDate) AS [quarter],
+	SalesQuota,
+	LAG(SalesQuota, 1, NULL) OVER(ORDER BY DATEPART(YEAR, QuotaDate) ASC, DATEPART(QUARTER, QuotaDate) ASC) AS prev_salesquota,
+	SalesQuota - LAG(SalesQuota, 1, NULL) OVER(ORDER BY DATEPART(YEAR, QuotaDate) ASC, DATEPART(QUARTER, QuotaDate) ASC) AS diff
+from sales.SalesPersonQuotaHistory
+where BusinessEntityID = 277
+	AND QuotaDate between '20220101 00:00:00' and '20231231 23:59:59'
+
+;
+WITH CTE_prep AS (
+	select
+		QuotaDate,
+		DATEPART(QUARTER, QuotaDate) AS [quarter],
+		SalesQuota,
+		LAG(SalesQuota, 1, NULL) OVER(ORDER BY DATEPART(YEAR, QuotaDate) ASC, DATEPART(QUARTER, QuotaDate) ASC) AS prev_salesquota
+	from sales.SalesPersonQuotaHistory
+	where BusinessEntityID = 277
+		AND QuotaDate between '20220101 00:00:00' and '20231231 23:59:59'
+)
+select 
+	QuotaDate,
+	[quarter],
+	SalesQuota,
+	prev_salesquota,
+	SalesQuota - prev_salesquota as diff
+from CTE_prep
+
+
+
+-- 182:
+select 
+	OrderDate,
+	DATEPART(QUARTER, OrderDate) AS [quarter],
+	DATEADD(DAY, 0, OrderDate),
+	DATETRUNC(MONTH, OrderDate)
+from sales.SalesOrderHeader
+
+
+
+-- 183:
+select
+	SalesOrderID,
+	DATETRUNC(MONTH, OrderDate) AS month_orderdate,
+	SalesPersonID,
+	CustomerID,
+	SubTotal,
+	sum(SubTotal) over(partition by SalesPersonID 
+						order by OrderDate 
+						rows between unbounded preceding and current row) AS runningtotal,
+	OrderDate
+from sales.SalesOrderHeader
+where SalesPersonID IS DISTINCT FROM NULL AND OrderDate >= '20111101 00:00:00'
+
+
+-- 184:
+select
+	Name,
+	ProductNumber,
+	concat(REPLICATE('0', 4), ProductNumber) AS fullproductnumber
+from Production.Product
+
+
+-- 185:
+select
+	Description,
+	DiscountPct,
+	ISNULL(minqty, 0) AS minqty,
+	COALESCE(maxqty, 0.00) AS maxqty
+from sales.SpecialOffer
+
+
+-- 189:
+select *
+from Production.workorder a
+full outer join Production.workorderrouting b on a.ProductID = b.ProductID and a.StartDate = b.ActualStartDate
+where a.ProductID is null OR b.ProductID IS NULL
+
+
+-- 190:
+select
+	SalesOrderID,
+	OrderDate,
+	CreditCardApprovalCode 
+from sales.salesorderheader
+where CreditCardApprovalCode LIKE '1_6%'
+
+
+-- 191:
+select
+	concat(N'The order is due on ', format(OrderDate, 'yyyy-MM-dd'))
+from Sales.SalesOrderHeader
+where SalesOrderID = 50001
