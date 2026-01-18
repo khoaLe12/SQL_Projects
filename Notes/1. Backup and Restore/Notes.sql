@@ -1,0 +1,87 @@
+USE [master];
+GO
+
+CREATE DATABASE [SQLTestDB];
+GO
+
+USE [SQLTestDB];
+GO
+CREATE TABLE SQLTest (
+    ID INT NOT NULL PRIMARY KEY,
+    c1 VARCHAR(100) NOT NULL,
+    dt1 DATETIME NOT NULL DEFAULT GETDATE()
+);
+GO
+
+USE [SQLTestDB];
+GO
+
+INSERT INTO SQLTest (ID, c1) VALUES (1, 'test1');
+INSERT INTO SQLTest (ID, c1) VALUES (2, 'test2');
+INSERT INTO SQLTest (ID, c1) VALUES (3, 'test3');
+INSERT INTO SQLTest (ID, c1) VALUES (4, 'test4');
+INSERT INTO SQLTest (ID, c1) VALUES (5, 'test5');
+GO
+
+SELECT * FROM SQLTest;
+GO
+
+
+
+
+
+
+-- Create backup
+USE [master];
+BACKUP DATABASE [SQLTestDB]
+TO DISK = N'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak'
+WITH NOFORMAT, NOINIT,
+NAME = N'SQLTestDB-Full Database Backup', SKIP, NOREWIND, STATS = 10;
+;
+-- Restore a database
+USE [master];
+RESTORE DATABASE [SQLTestDB]
+FROM DISK = N'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak'
+;
+-- Drop database and backup history in msdb database
+-- msdb database is used by SQL Server Agent for scheduling alerts and jobs.
+EXEC msdb.dbo.sp_delete_database_backuphistory @database_name = N'SQLTestDB'
+USE [master];
+DROP DATABASE [SQLTestDB];
+
+
+
+
+
+
+-- FULL DATABASE BACKUP
+-- 1. Estimate the size of full database 
+USE [SQLTestDB]
+EXEC sp_spaceused
+-- 2. To Suppress backup log entries, using trace flag 3266 (IF NONE OF SCRIPTS DEPEND ON THOSE ENTRIES)
+DBCC TRACEON (3226 , -1) -- enable suppress
+DBCC TRACEOFF (3226 , -1) -- disable
+-- 3. Create an encrypted backup
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<password>';
+OPEN MASTER KEY DECRYPTION BY PASSWORD = '<password>'
+;
+CREATE CERTIFICATE MyCertificate
+WITH SUBJECT = 'Backup Cert', EXPIRY_DATE = '20261231';
+-- 4. Backup to a disk device
+USE [master];
+BACKUP DATABASE [SQLTestDB]
+TO DISK = N'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak'
+    WITH 
+        SKIP, 
+        NOREWIND, 
+        FORMAT,
+        MEDIANAME = 'SQLServerBackups',
+        NAME = N'Full backup of SQLTestDB', 
+        --COMPRESSION (ALGORITHM = ZSTD), -- compression cost performance but reduce the backup size
+        --ENCRYPTION (
+        --    ALGORITHM = AES_256,
+        --    SERVER CERTIFICATE = MyCertificate
+        --),
+        STATS = 10;
+-- 5. Identify the backup ratio of compressed backup
+SELECT name AS backup_name, database_name, backup_size, compressed_backup_size, compression_algorithm, backup_size/compressed_backup_size AS ratio FROM msdb..backupset;  
