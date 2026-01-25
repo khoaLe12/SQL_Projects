@@ -31,13 +31,18 @@ GO
 
 
 
--- Create backup
+-- [SQLTestDB] database is set to use the full recovery model
+USE [master];
+ALTER DATABASE [SQLTestDB] SET RECOVERY FULL;
+-- Create backup (backup set 1)
 USE [master];
 BACKUP DATABASE [SQLTestDB]
 TO DISK = N'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak'
 WITH NOFORMAT, NOINIT,
 NAME = N'SQLTestDB-Full Database Backup', SKIP, NOREWIND, STATS = 10;
 ;
+-- Create a routine log backup (backup set 2)
+BACKUP LOG [SQLTestDB] TO DISK = 'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak';
 -- Restore a database
 USE [master];
 RESTORE DATABASE [SQLTestDB]
@@ -54,7 +59,7 @@ DROP DATABASE [SQLTestDB];
 
 
 
--- FULL DATABASE BACKUP
+-- FULL DATABASE BACKUP, followed by differential backup
 -- 1. Estimate the size of full database 
 USE [SQLTestDB]
 EXEC sp_spaceused
@@ -77,11 +82,43 @@ TO DISK = N'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak'
         FORMAT,
         MEDIANAME = 'SQLServerBackups',
         NAME = N'Full backup of SQLTestDB', 
-        --COMPRESSION (ALGORITHM = ZSTD), -- compression cost performance but reduce the backup size
-        --ENCRYPTION (
-        --    ALGORITHM = AES_256,
-        --    SERVER CERTIFICATE = MyCertificate
-        --),
+        COMPRESSION (ALGORITHM = ZSTD), -- compression cost performance but reduce the backup size
+        ENCRYPTION (
+            ALGORITHM = AES_256,
+            SERVER CERTIFICATE = MyCertificate
+        ),
         STATS = 10;
--- 5. Identify the backup ratio of compressed backup
+-- 5. NOTES: since the On-Premise is not available, consider using simple backup strategy
+USE [master];
+BACKUP DATABASE [SQLTestDB]
+TO DISK = N'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak'
+    WITH 
+        SKIP, 
+        NOREWIND, 
+        FORMAT, -- FORMAT indicates overwrite any existing backup
+        MEDIANAME = 'SQLServerBackups',
+        NAME = N'Full backup of SQLTestDB', 
+        STATS = 10;
+-- 6. Identify the backup ratio of compressed backup
 SELECT name AS backup_name, database_name, backup_size, compressed_backup_size, compression_algorithm, backup_size/compressed_backup_size AS ratio FROM msdb..backupset;  
+-- 7. Differntial backup with Full backup as Base of differential
+-- Recommend strategy, Full backup weekly and differential backups during the week
+-- Day 1 (backup of 1 day)
+USE [master];
+BACKUP DATABASE [SQLTestDB]
+TO DISK = N'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB_diff1.bak'
+    WITH DIFFERENTIAL;
+GO
+-- Day 2 (backup of 2 days)
+USE [master];
+BACKUP DATABASE [SQLTestDB]
+TO DISK = N'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB_diff2.bak'
+    WITH DIFFERENTIAL;
+GO
+-- 8. Restore
+-- Restore base
+RESTORE DATABASE [SQLTestDB] FROM DISK = 'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak' WITH NORECOVERY;
+-- Restore state of day 1
+RESTORE DATABASE [SQLTestDB] FROM DISK = 'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB_diff1.bak' WITH RECOVERY;
+-- Restore state of day 2
+RESTORE DATABASE [SQLTestDB] FROM DISK = 'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB_diff2.bak' WITH RECOVERY;
