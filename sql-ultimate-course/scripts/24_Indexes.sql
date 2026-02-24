@@ -9,7 +9,7 @@
    Table of Contents:
 	   Index Types:
 			 - Clustered and Non-Clustered Indexes
-			 - Leftmost Prefix Rule Explanation
+			 - Leftmost Prefix Rule Explaination
 			 - Columnstore Indexes
 			 - Unique Indexes
 			 - Filtered Indexes
