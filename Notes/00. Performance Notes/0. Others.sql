@@ -93,12 +93,7 @@ GO
 
 
 
-
-sp_who
-sp_who2
-
-
-select * from sys.sysprocesses
-
-
-DBCC INPUTBUFFER 
+-- CONTENT
+-- A request is also called a batch and may contain one ore more queries.
+-- A session may have multiple requests active at the same time.
+-- Each query in the request may start multiple threads (tasks), if a parallel execution plan is used.

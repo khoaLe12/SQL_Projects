@@ -142,13 +142,87 @@ GO
 
 -- DETECT TEMPDB ALLOCATION CONTENTION
 SELECT
-	ws.session_id,
-	ws.wait_type,
-	ws.waiting_tasks_count,
-	ws.wait_time_ms,
-	ws.max_wait_time_ms,
-	ws.signal_wait_time_ms
+	ws.session_id AS [session id],
+	ws.wait_type AS [wait type],
+	ws.waiting_tasks_count AS [waiting tasks count],
+	ISNULL(RTRIM(CAST(ws.wait_time_ms / 1000.0 AS CHAR)) + 's', '') AS [wait time],
+	ISNULL(RTRIM(CAST(ws.max_wait_time_ms / 1000.0 AS CHAR)) + 's', '') AS [max wait time],
+	ISNULL(RTRIM(CAST(ws.signal_wait_time_ms / 1000.0 AS CHAR)) + 's', '') AS [signal wait time]
 FROM sys.dm_exec_session_wait_stats ws
+WHERE wait_type LIKE 'PAGELATCH%'
+GO
+;
+SELECT 
+	-- Task info
+	wt.session_id AS [session id],
+	r.request_id AS [request id],
+	r.status AS [request status],
+	(
+		SELECT SUBSTRING(
+			dest.text,
+			(r.statement_start_offset / 2) + 1,  -- start index of sql text of current executing statement in a query
+			((CASE r.statement_end_offset
+				WHEN -1 THEN DATALENGTH(dest.text)
+				ELSE r.statement_end_offset
+			END - r.statement_start_offset) / 2) + 1
+		)
+		FOR XML PATH (''), TYPE
+	) AS [sql text],
+	ISNULL(r.parallel_worker_count, 0) AS [number of active parallel tasks],
+	wt.waiting_task_address AS [task address],
+	t.task_state AS [task status],
+	wt.wait_type AS [wait type],
+	ISNULL(RTRIM(CAST(wt.wait_duration_ms / 1000.0 AS CHAR)) + 's', '') AS [wait duration],
+	wt.resource_description AS [resource description],
+	t.task_local_storage AS [task local storage],
+
+	-- Blocking request infor
+	br.session_id AS [blocking session],
+	br.request_id AS [blocking request],
+	br.status AS [blocking request status],
+	(
+		SELECT SUBSTRING(
+			dest_br.text,
+			(br.statement_start_offset / 2) + 1,  -- start index of sql text of current executing statement in a query
+			((CASE br.statement_end_offset
+				WHEN -1 THEN DATALENGTH(dest_br.text)
+				ELSE br.statement_end_offset
+			END - br.statement_start_offset) / 2) + 1
+		)
+		FOR XML PATH (''), TYPE
+	) AS [blocking request - sql text]
+FROM sys.dm_os_waiting_tasks wt
+INNER JOIN sys.dm_exec_sessions S ON s.session_id = wt.session_id AND s.is_user_process = 1
+LEFT JOIN sys.dm_os_tasks t ON t.task_address = wt.waiting_task_address
+LEFT JOIN sys.dm_exec_requests r On r.request_id = t.request_id AND r.session_id = t.session_id
+OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) AS dest
+LEFT JOIN sys.dm_exec_requests br ON br.session_id = r.blocking_session_id
+OUTER APPLY sys.dm_exec_sql_text(br.sql_handle) AS dest_br
+WHERE wt.wait_type LIKE 'PAGELATCH%'
+ORDER BY wt.session_id, t.request_id
+GO
+
+
+
+select CONVERT(xml, '<TASK_LOCAL_STORAGE><STORAGE_ENGINE><LATCH_TRACKING type="CountOnly"></LATCH class="BUFFER" count="1"></LATCH_TRACKING></STORAGE_ENGINE> </TASK_LOCAL_STORAGE>')
+
+
+
+select 
+	CONVERT(xml, dorb.record),
+	dorb.record
+FROM sys.dm_os_ring_buffers dorb
+
+
+
+select * from sys.dm_exec_requests
+
+select * FROM sys.dm_os_waiting_tasks wt
+
+SELECT * FROM sys.dm_os_tasks order by session_id, request_id, task_address
+
+select * from sys.dm_exec_sessions
+
 
 
 -- B3: Add more tempdb data files (usually by the current numer of files multiply by 4) until the allocation contention decreases to acceptable levels
