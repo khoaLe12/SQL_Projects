@@ -39,26 +39,28 @@
 
 
 -- TEMPDB PRACTICE
--- CHECK CURRENT SIZE AND GROWTH VALUE OF TEMPDB DATA FILES
+-- 1. CHECK CURRENT SIZE AND GROWTH VALUE OF TEMPDB DATA FILES
 SELECT 
-	name AS [file name],
-	type_desc AS [file type],
-	ISNULL(RTRIM(CAST(size * 8.0 / 1024 AS CHAR)) + ' MB', '') AS [size],
-	CASE max_size
+	f.name AS [file name],
+	f.type_desc AS [file type],
+	ISNULL(RTRIM(CAST(f.size * 8.0 / 1024 AS CHAR)) + ' MB', '') AS [size],
+	CASE f.max_size
 		WHEN -1 THEN 'Unlimited'
-		ELSE ISNULL(RTRIM(CAST(max_size * 8.0 / 1024 AS CHAR)) + ' MB', '')
+		ELSE ISNULL(RTRIM(CAST(f.max_size * 8.0 / 1024 AS CHAR)) + ' MB', '')
 	END AS [max size],
-	IIF(growth = 0, 'False', 'True') AS [is auto growth],
+	IIF(f.growth = 0, 'False', 'True') AS [is auto growth],
 	CASE
-		WHEN growth = 0 THEN '0 MB'
-		WHEN growth > 0 AND is_percent_growth = 0 THEN ISNULL(RTRIM(CAST(growth * 8.0 / 1024 AS CHAR)) + ' MB', '')
-		WHEN growth > 0 AND is_percent_growth = 1 THEN ISNULL(RTRIM(CAST(growth AS CHAR)) + '%', '')
-	END AS [growth value]
-FROM tempdb.sys.database_files
-GO;
+		WHEN f.growth = 0 THEN '0 MB'
+		WHEN f.growth > 0 AND f.is_percent_growth = 0 THEN ISNULL(RTRIM(CAST(f.growth * 8.0 / 1024 AS CHAR)) + ' MB', '')
+		WHEN f.growth > 0 AND f.is_percent_growth = 1 THEN ISNULL(RTRIM(CAST(f.growth AS CHAR)) + '%', '')
+	END AS [growth value],
+	mf.physical_name AS [physical file path]
+FROM tempdb.sys.database_files f
+LEFT JOIN sys.master_files mf ON mf.file_id = f.file_id AND mf.database_id = DB_ID('tempdb');
+GO
 
 
--- MONIOR TEMPDB FILE SPACE USAGE
+-- 2. MONIOR TEMPDB FILE SPACE USAGE
 SELECT 
 	ISNULL(RTRIM(CAST(SUM(total_page_count) * 8.0 / 1024 AS CHAR)) + ' MB', '') AS [reserved space],
 	ISNULL(RTRIM(CAST(SUM(allocated_extent_page_count) * 8.0 / 1024 AS CHAR)) + ' MB', '') AS [allocated space],
@@ -71,7 +73,7 @@ FROM tempdb.sys.dm_db_file_space_usage
 GO;
 
 
--- MONITOR TEMPDB FILE SPACE USAGE OF SESSIONS/REQUESTS (WITH SOME DETAILS OF REQUEST)
+-- 3. MONITOR TEMPDB FILE SPACE USAGE OF SESSIONS/REQUESTS (WITH SOME DETAILS OF REQUEST)
 SELECT 
 	u.session_id,
 	ISNULL(RTRIM(CAST(u.user_objects_alloc_page_count * 8.0 / 1024 AS CHAR)) + ' MB', '') AS [user objects allocation],
@@ -91,7 +93,7 @@ SELECT
 	s.login_name AS [login name],
 	s.original_login_name AS [origin name],
 	s.status AS [status],
-	ISNULL(FORMAT(s.last_request_end_time, 'dd-MM-yyyy HH:mm:ss'), 'Undefined') + ' - ' + ISNULL(FORMAT(s.last_request_end_time, 'dd-MM-yyyy HH:mm:ss'), 'Current') AS [last request],
+	ISNULL(FORMAT(s.last_request_start_time, 'dd-MM-yyyy HH:mm:ss'), 'Undefined') + ' - ' + ISNULL(FORMAT(s.last_request_end_time, 'dd-MM-yyyy HH:mm:ss'), 'Current') AS [last request],
 	s.open_transaction_count AS [open transaction count]
 FROM sys.dm_db_session_space_usage u
 LEFT JOIN sys.dm_exec_sessions s ON s.session_id = u.session_id
@@ -140,7 +142,7 @@ OUTER APPLY sys.dm_exec_text_query_plan(r.plan_handle, r.statement_start_offset,
 GO
 
 
--- DETECT TEMPDB ALLOCATION CONTENTION
+-- 4. DETECT TEMPDB ALLOCATION CONTENTIONS
 SELECT
 	ws.session_id AS [session id],
 	ws.wait_type AS [wait type],
@@ -160,20 +162,20 @@ SELECT
 	(
 		SELECT SUBSTRING(
 			dest.text,
-			(r.statement_start_offset / 2) + 1,  -- start index of sql text of current executing statement in a query
+			(r.statement_start_offset / 2) + 1,
 			((CASE r.statement_end_offset
 				WHEN -1 THEN DATALENGTH(dest.text)
 				ELSE r.statement_end_offset
 			END - r.statement_start_offset) / 2) + 1
 		)
 		FOR XML PATH (''), TYPE
-	) AS [sql text],
+	) AS [sql text], -- sql text of current current executed statement of a query
 	ISNULL(r.parallel_worker_count, 0) AS [number of active parallel tasks],
 	wt.waiting_task_address AS [task address],
 	t.task_state AS [task status],
 	wt.wait_type AS [wait type],
 	ISNULL(RTRIM(CAST(wt.wait_duration_ms / 1000.0 AS CHAR)) + 's', '') AS [wait duration],
-	wt.resource_description AS [resource description],
+	wt.resource_description AS [resource description], -- tempdb file on which the request is waiting
 	t.task_local_storage AS [task local storage],
 
 	-- Blocking request infor
@@ -190,12 +192,24 @@ SELECT
 			END - br.statement_start_offset) / 2) + 1
 		)
 		FOR XML PATH (''), TYPE
-	) AS [blocking request - sql text]
+	) AS [blocking request - sql text],
+
+	-- detail target resource page information of the current request
+	dpi.database_id,
+	dpi.pfs_status,
+	dpi.gam_status,
+	dpi.sgam_status,
+	dpi.diff_status,
+	dpi.ml_status,
+	dpi.page_type_desc
 FROM sys.dm_os_waiting_tasks wt
 INNER JOIN sys.dm_exec_sessions S ON s.session_id = wt.session_id AND s.is_user_process = 1
 LEFT JOIN sys.dm_os_tasks t ON t.task_address = wt.waiting_task_address
 LEFT JOIN sys.dm_exec_requests r On r.request_id = t.request_id AND r.session_id = t.session_id
 OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) AS dest
+CROSS APPLY sys.fn_PageResCracker(r.page_resource) AS prc
+CROSS APPLY sys.dm_db_page_info(prc.db_id, prc.file_id, prc.page_id, 'DETAILED') AS dpi
+
 LEFT JOIN sys.dm_exec_requests br ON br.session_id = r.blocking_session_id
 OUTER APPLY sys.dm_exec_sql_text(br.sql_handle) AS dest_br
 WHERE wt.wait_type LIKE 'PAGELATCH%'
@@ -204,129 +218,75 @@ GO
 
 
 
-select CONVERT(xml, '<TASK_LOCAL_STORAGE><STORAGE_ENGINE><LATCH_TRACKING type="CountOnly"></LATCH class="BUFFER" count="1"></LATCH_TRACKING></STORAGE_ENGINE> </TASK_LOCAL_STORAGE>')
-
-
-
-select 
-	CONVERT(xml, dorb.record),
-	dorb.record
-FROM sys.dm_os_ring_buffers dorb
-
-
-
-select * from sys.dm_exec_requests
-
-select * FROM sys.dm_os_waiting_tasks wt
-
-SELECT * FROM sys.dm_os_tasks order by session_id, request_id, task_address
-
-select * from sys.dm_exec_sessions
-
-
-
--- B3: Add more tempdb data files (usually by the current numer of files multiply by 4) until the allocation contention decreases to acceptable levels
--- View all data files of tempdb
-SELECT
-	fg.name AS FilegroupName,
-	mf.name AS LogicalFileName,
-	mf.physical_name AS PhysicalFilePath,
-	mf.size / 128 AS SizeInMB
-FROM sys.filegroups fg
-JOIN sys.master_files mf ON fg.data_space_id = mf.data_space_id
-WHERE mf.database_id = DB_ID('tempdb');
--- Add 1 more data file
+-- 5. ADD MORE TEMPDB DATA FILES
 ALTER DATABASE tempdb ADD FILE
 (
-	NAME = temp5, -- Logical name
-	FILENAME = 'C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQL2017\MSSQL\DATA\tempdb_mssql_5.ndf'
-) TO FILEGROUP [PRIMARY];
+	NAME = tempdev1, -- Logical name
+	FILENAME = '/mnt/disks/sdb/tempdb/tempdb_mssql_1.mdf' -- Physical path for linux 
+) TO FILEGROUP [PRIMARY]
+GO
+;
+ALTER DATABASE tempdb ADD FILE
+(
+	NAME = tempdev1, -- Logical name
+	FILENAME = 'C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQL2017\MSSQL\DATA\tempdb_mssql_1.ndf' -- Physical path for Windows
+) TO FILEGROUP [PRIMARY]
+GO
+;
+-- MODIFY PHYSICAL PATH
+ALTER DATABASE tempdb
+MODIFY FILE (NAME = tempdev, FILENAME = '/mnt/disks/mssql/tempdb/tempdb.mdf');
+GO
+ALTER DATABASE tempdb
+MODIFY FILE (NAME = templog, FILENAME = '/mnt/disks/mssql/tempdb/templog.ldf');
+GO
+ALTER DATABASE tempdb
+MODIFY FILE (NAME = tempdev2, FILENAME = '/mnt/disks/mssql/tempdb/tempdb2.ndf');
+GO
+;
 
 
 
--- B4: Preallocate space for all tempdb files by setting the file size to a large value
+-- 6. PREALLOCATE SPACE FOR ALL TEMPDB FILES WITH EXPECTED MAXIMUM SIZE
 ALTER DATABASE tempdb
-MODIFY FILE (NAME = tempdev, SIZE = 128 MB);
+MODIFY FILE (NAME = tempdev, SIZE = 256 MB);
 ALTER DATABASE tempdb
-MODIFY FILE (NAME = temp2, SIZE = 128 MB);
-ALTER DATABASE tempdb
-MODIFY FILE (NAME = temp3, SIZE = 128 MB);
-ALTER DATABASE tempdb
-MODIFY FILE (NAME = temp4, SIZE = 128 MB);
-ALTER DATABASE tempdb
-MODIFY FILE (NAME = temp5, SIZE = 128 MB);
--- To Decrease (shrink) the file size
+MODIFY FILE (NAME = temp1, SIZE = 256 MB);
+
+-- DECREASE (SHRINK) THE FILE SIZE
+USE tempdb;
+GO
 DBCC SHRINKFILE (tempdev, 8);
+GO
 
 
 
--- B5: Check configuration
+-- CHECK CONFIGURATION
 -- For SQL Server 2016 or later, keep the default behavior of tempdb
 ALTER DATABASE tempdb SET MIXED_PAGE_ALLOCATION = OFF;
 ALTER DATABASE YourDB SET AUTOGROW_ALL_FILES = ON;
+
 -- For SQL Server 2014 or earlier, turn on TRACE FLAG 1117, 1118
 DBCC TRACEON  (1117); DBCC TRACEON  (1118); -- This only turn on trace flags temporarily (search more for Enable permanently)
 
 
 
--- B6: If possible, use "instant file initialization" to improve performance of the growth operations for data files
--- This mechanism help to skip the process of zeroing the allocated memory 
--- This could make security risk since deleted area of files could be potentially accessible by an unauthorized principal
--- -> Make sure the "SE_MANAGE_VOLUME_NAME" privilege is granted to appropriate "Service SID" or "Database Engine service"
-EXEC xp_cmdshell 'ntrights -u "sa" +r SeManageVolumePrivilege' -- This procedure run ntrights.exe to grant the privilege to account sa
--- Or follow the step of https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-instant-file-initialization?view=sql-server-ver17#enable-instant-file-initialization
+-- ENABLE "instant file initialization"
+-- FOLLOW STEPS FROM THIS REFERENCE: https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-instant-file-initialization?view=sql-server-ver17#enable-instant-file-initialization
 
 
 
--- B7: Enabling Memory-optimized TempDB metadata (only available on Enterprise, Developer, or Evaluation edition)
--- This feature solves the problem of temporary object metedata contention inside tempdb
--- Or follow: https://www.microsoft.com/en-us/sql-server/blog/2022/07/21/improve-scalability-with-system-page-latch-concurrency-enhancements-in-sql-server-2022/
--- B7.1: Diagnostic query of temporary object metadata contention at executed time only (return the number of sessions contending for access to system table)
-SELECT
-	OBJECT_NAME(dpi.object_id, dpi.database_id) AS system_table_name,
-	COUNT(DISTINCT (r.session_id)) AS session_count
-FROM sys.dm_exec_requests AS r
-CROSS APPLY sys.fn_PageResCracker(r.page_resource) AS prc
-CROSS APPLY sys.dm_db_page_info(prc.db_id, prc.file_id, prc.page_id, 'LIMITED') AS dpi
-WHERE dpi.database_id = 2 -- 0: resource, 1: master, 2: tempdb, 3: model, 4: msdb, 5+: user databases
-	AND dpi.object_id IN (3, 9, 34, 40, 41, 54, 55, 60, 74, 75)
-	AND UPPER(r.wait_type) LIKE N'PAGELATCH[_]%'
-GROUP BY dpi.object_id, dpi.database_id
-;
-SELECT 
-	er.session_id,
-	er.wait_type,
-	er.wait_resource,
-	OBJECT_NAME(page_info.object_id, page_info.database_id) AS [object_name],
-	er.blocking_session_id,
-	er.command,
-	SUBSTRING(st.text, (er.statement_start_offset/2) + 1, 
-		((
-			CASE er.statement_end_offset
-				WHEN -1 THEN DATALENGTH(st.text)
-				ELSE er.statement_end_offset
-			END - er.statement_start_offset
-		)/2) + 1) AS statement_text,
-	page_info.database_id,
-	page_info.file_id,
-	page_info.page_id,
-	page_info.object_id,
-	page_info.index_id,
-	page_info.page_type_desc
-FROM sys.dm_exec_requests AS er
-CROSS APPLY sys.dm_exec_sql_text(er.sql_handle) AS st
-CROSS APPLY sys.fn_PageResCracker (er.page_resource) AS r
-CROSS APPLY sys.dm_db_page_info(r.db_id, r.file_id, r.page_id, 'DETAILED') AS page_info
-WHERE er.wait_type LIKE '%page%'
--- B7.2: Configure and use Memory-optimized TempDB metadata (if contentions are detected from above diagnostic query)
--- Enable/Disable Memory-optimized TempDB metadata
+-- ENABLE/DISABLE "Memory-optimized TempDB metadata" (only available on Enterprise, Developer, or Evaluation edition)
 ALTER SERVER CONFIGURATION SET MEMORY_OPTIMIZED TEMPDB_METADATA = ON;
 ALTER SERVER CONFIGURATION SET MEMORY_OPTIMIZED TEMPDB_METADATA = OFF;
--- Verify whether or not tempdb is memory-optimized
+
+-- VERIFY IF TEMPDB IS MEMORY-OPTIMIZED
 SELECT SERVERPROPERTY('IsTempdbMetadataMemoryOptimized');
--- Limit memory usage
+
+-- LIMIT MEMORY USAGE
 CREATE RESOURCE POOL tempdb_resource_pool WITH (MAX_MEMORY_PERCENT = 20);
 ALTER RESOURCE GOVERNOR RECONFIGURE;
 ALTER SERVER CONFIGURATION SET MEMORY_OPTIMIZED TEMPDB_METADATA = ON (RESOURCE_POOL = 'tempdb_resource_pool')
--- Rmove memory usage limitation
+
+-- REMOVE MEMORY USAGE LIMITATION
 ALTER SERVER CONFIGURATION SET MEMORY_OPTIMIZED TEMPDB_METADATA = ON;
