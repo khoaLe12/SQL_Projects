@@ -93,6 +93,7 @@ GO
 
 
 
+
 -- CONTENT
 -- A request is also called a batch and may contain one ore more queries.
 -- A session may have multiple requests active at the same time.
