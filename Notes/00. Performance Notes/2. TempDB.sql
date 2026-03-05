@@ -143,12 +143,22 @@ GO
 -- DETECT TEMPDB ALLOCATION CONTENTION
 SELECT
 	ws.session_id,
-	ws.wait_type,
-	ws.waiting_tasks_count,
-	ws.wait_time_ms,
-	ws.max_wait_time_ms,
-	ws.signal_wait_time_ms
+	ws.wait_type AS [wait type],
+	ws.waiting_tasks_count AS [waiting tasks count],
+	RTRIM(CAST(ws.wait_time_ms AS CHAR)) + ' ms' AS [wait time],
+	t.wait_type,
+	t.wait_duration_ms
 FROM sys.dm_exec_session_wait_stats ws
+LEFT JOIN sys.dm_os_waiting_tasks t ON ws.session_id = ws.session_id
+
+select * from sys.dm_exec_requests where wait_type LIKE 'PAGELATCH%'
+select * from sys.dm_os_waiting_tasks order by session_id
+select * from sys.dm_exec_session_wait_stats order by session_id
+select * from sys.dm_os_wait_stats where wait_type LIKE 'PAGELATCH%'
+
+select r.session_id, r.request_id, r.task_address, r.wait_type, t.wait_type, r.wait_resource, t.resource_address, r.wait_time, t.wait_duration_ms from sys.dm_exec_requests r
+left join sys.dm_os_waiting_tasks t ON t.waiting_task_address = r.task_address 
+
 
 
 -- B3: Add more tempdb data files (usually by the current numer of files multiply by 4) until the allocation contention decreases to acceptable levels

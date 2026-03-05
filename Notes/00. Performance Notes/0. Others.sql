@@ -87,18 +87,3 @@ GO
 -- View detailed information of a data page
 select * from sys.dm_db_page_info(5, 1, 12537, 'DETAILED');
 GO
-
-
-
-
-
-
-
-sp_who
-sp_who2
-
-
-select * from sys.sysprocesses
-
-
-DBCC INPUTBUFFER 
