@@ -535,25 +535,22 @@ GO
 --	+ Rebuild a columnstore index removed fragmenatation, and moves any delta store rows into columnstore
 
 -- MEASURE INDEX FRAGMENTATION AND PAGE DENSITY
-USE AdventureWorks2025
 SELECT 
 	'' AS [Rowstore index fragmentation],
-	'Person.Person' AS [detected table],
-	index_type_desc AS [index type],
-	alloc_unit_type_desc AS [unit type],
-	page_count AS [page count],
-	FORMAT(avg_fragmentation_in_percent, '##0.###') + '%' AS [avg fragmentation percent],
-	ISNULL(fragment_count, 0) AS [fragment count],
-	ISNULL(avg_fragment_size_in_pages, 0)  AS [avg page density]
-FROM sys.dm_db_index_physical_stats(DB_ID('AdventureWorks2025'), OBJECT_ID('Person.Person', 'U'), NULL, NULL, NULL)
+	DB_NAME(ips.database_id) AS [database name],
+	ISNULL(OBJECT_SCHEMA_NAME(ips.object_id, ips.database_id), '') + '.' + ISNULL(OBJECT_NAME(ips.object_id, ips.database_id), '') AS [table name],
+	idx.name AS [index name],
+	ips.index_type_desc AS [index type],
+	ips.alloc_unit_type_desc AS [unit type],
+	ips.page_count AS [page count],
+	FORMAT(ips.avg_fragmentation_in_percent, '##0.###') + '%' AS [avg fragmentation percent],
+	ISNULL(ips.fragment_count, 0) AS [fragment count],
+	FORMAT(ips.avg_page_space_used_in_percent, '##0,###') + '%'  AS [avg page space used],
+	ISNULL(ips.avg_fragment_size_in_pages, 0)  AS [avg page density],
+	ips.alloc_unit_type_desc AS [alloc unit type]
+FROM sys.dm_db_index_physical_stats(DB_ID('AE21_VanPhat_CongNghiep'), NULL, NULL, NULL, NULL) ips
+INNER JOIN sys.indexes idx ON idx.object_id = ips.object_id AND idx.index_id = ips.index_id
 ORDER BY [avg fragmentation percent] DESC
-;
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID('Person.Person', 'U') AND [name] = 'Idx_columnstore_Person_lastname')
-	CREATE NONCLUSTERED COLUMNSTORE INDEX Idx_columnstore_Person_lastname ON Person.Person(LastName)
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID('Person.Person', 'U') AND [name] = 'Idx_columnstore_Person_middleName')
-	CREATE NONCLUSTERED COLUMNSTORE INDEX Idx_columnstore_Person_middleName ON Person.Person(MiddleName)
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID('Person.Person', 'U') AND [name] = 'Idx_columnstore_Person_emailPromotion')
-	CREATE NONCLUSTERED COLUMNSTORE INDEX Idx_columnstore_Person_emailPromotion ON Person.Person(EmailPromotion)
 ;
 WITH CTE_columnstore_row_group_partition AS (
 	SELECT 
