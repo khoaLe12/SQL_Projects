@@ -87,3 +87,14 @@ GO
 -- View detailed information of a data page
 select * from sys.dm_db_page_info(5, 1, 12537, 'DETAILED');
 GO
+
+
+
+
+
+
+
+-- CONTENT
+-- A request is also called a batch and may contain one ore more queries.
+-- A session may have multiple requests active at the same time.
+-- Each query in the request may start multiple threads (tasks), if a parallel execution plan is used.

@@ -477,7 +477,7 @@ CREATE NONCLUSTERED INDEX Idx_Table_computedcolumn_nonprecise2 ON sc2.Table_comp
 
 
 
--- 5A: Tune nonclustered indexes
+-- 5A: TUNE NONCLUSTERED INDEXES
 -- 1.SQL Server provide missing index feature which give index suggestions.
 -- 2. Index suggestions has some limitations: 
 --	+ There are no tests or cost-benefit analysis againts suggestions.
@@ -488,3 +488,112 @@ CREATE NONCLUSTERED INDEX Idx_Table_computedcolumn_nonprecise2 ON sc2.Table_comp
 --	+ sys.dm_db_missing_index_groups: information of groups of missing indexes.
 --	+ sys.dm_db_missing_index_details: detailed information like table name, column names and column types to make up the missing index.
 --	+ sys.dm_db_missing_index_columns: information about table columns that are missing an index.
+SELECT 
+	TOP 20
+	CONVERT(varchar(30), GETDATE(), 126) AS runtime,
+	CONVERT(decimal(28,1),
+		migs.avg_total_system_cost * migs.avg_user_impact * (migs.user_seeks + migs.user_scans)
+	) AS estimated_improvement,
+	'CREATE INDEX missing_index_' +
+		CONVERT(varchar, mig.index_group_handle) + '_' +
+		CONVERT(varchar, mid.index_handle) + ' ON ' +
+		mid.statement + ' (' + ISNULL(mid.equality_columns, '') +
+		CASE
+			WHEN mid.equality_columns IS NOT NULL
+				AND mid.inequality_columns IS NOT NULL
+				THEN ','
+			ELSE ''
+		END + ISNULL(mid.inequality_columns, '') + ')' +
+		ISNULL(' INCLUDE (' + mid.included_columns + ')', '') AS create_index_statement
+FROM sys.dm_db_missing_index_groups mig
+JOIN sys.dm_db_missing_index_group_stats migs ON migs.group_handle = mig.index_group_handle
+JOIN sys.dm_db_missing_index_details mid ON mid.index_handle = mig.index_handle
+ORDER BY estimated_improvement DESC;
+GO
+
+
+
+
+
+
+-- 5B: INDEX MAINTENANCE
+-- 1. Index fragmentation (only occurs on rowstore index):
+--	+ Exists when logical ordering within the index does not macth the physical ordering of index pages (means index data are not sequentially stored).
+--	+ Increasing as many data modifications performed, especially non-sequential insertion on full page causes page splits.
+--	+ As more page splits occurs, more pages and gaps on pages increased, cause the index to become scattered (fragmented)
+--	+ For full/range index scans, additional I/O is required as more pages to read
+-- 2. Page density
+--	+ Define how much space allocated on a page
+--	+ If page density is low, more pages are created to store the same amount of data
+--	+ With low page density, there are more pages to read, therefore the cost of I/O is higher
+-- 3. In columnstore index, fragmentation is defined as the ratio of deleted rows to total rows
+-- 4. Implement Index Reorganize and Rebuild operation to reduce index fragmentation and increase page density.
+--	+ Reorganize rowstore index is physically reorder the leaf-level pages, and compacts index page to the fill factor of the index
+--	+ Reorganize columnstore index forces delta store rows goups into compressed larger row groups which reduce the number of groups, this cost CPU resource to cpmress data
+--	+ Rebuild an index will drop and re-create the whole index tree, which cost more resource comapred to Reorganize
+--	+ Rebuild rowstore index removes fragmentation in all levels of index, rebuild can be performed on a single index to all indexes at once
+--	+ Rebuild a columnstore index removed fragmenatation, and moves any delta store rows into columnstore
+
+-- MEASURE INDEX FRAGMENTATION AND PAGE DENSITY
+USE AdventureWorks2025
+SELECT 
+	'' AS [Rowstore index fragmentation],
+	'Person.Person' AS [detected table],
+	index_type_desc AS [index type],
+	alloc_unit_type_desc AS [unit type],
+	page_count AS [page count],
+	FORMAT(avg_fragmentation_in_percent, '##0.###') + '%' AS [avg fragmentation percent],
+	ISNULL(fragment_count, 0) AS [fragment count],
+	ISNULL(avg_fragment_size_in_pages, 0)  AS [avg page density]
+FROM sys.dm_db_index_physical_stats(DB_ID('AdventureWorks2025'), OBJECT_ID('Person.Person', 'U'), NULL, NULL, NULL)
+ORDER BY [avg fragmentation percent] DESC
+;
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID('Person.Person', 'U') AND [name] = 'Idx_columnstore_Person_lastname')
+	CREATE NONCLUSTERED COLUMNSTORE INDEX Idx_columnstore_Person_lastname ON Person.Person(LastName)
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID('Person.Person', 'U') AND [name] = 'Idx_columnstore_Person_middleName')
+	CREATE NONCLUSTERED COLUMNSTORE INDEX Idx_columnstore_Person_middleName ON Person.Person(MiddleName)
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE [object_id] = OBJECT_ID('Person.Person', 'U') AND [name] = 'Idx_columnstore_Person_emailPromotion')
+	CREATE NONCLUSTERED COLUMNSTORE INDEX Idx_columnstore_Person_emailPromotion ON Person.Person(EmailPromotion)
+;
+WITH CTE_columnstore_row_group_partition AS (
+	SELECT 
+		object_id,
+		index_id,
+		partition_number,
+		SUM(deleted_rows) AS partition_deleted_rows,
+		SUM(total_rows) AS partition_total_rows
+	FROM sys.dm_db_column_store_row_group_physical_stats
+	WHERE state_desc = 'COMPRESSED'
+	GROUP BY object_id, index_id, partition_number
+),
+CTE_columnstore_internal_partition AS (
+	SELECT
+		object_id,
+		index_id,
+		partition_number,
+		SUM(rows) AS delete_buffer_rows
+	FROM sys.internal_partitions
+	WHERE internal_object_type_desc = 'COLUMN_STORE_DELETE_BUFFER'
+	GROUP BY object_id, index_id, partition_number
+)
+SELECT 
+	OBJECT_SCHEMA_NAME(i.object_id) AS schema_name,
+	OBJECT_NAME(i.object_id) AS object_name,
+	i.name AS index_name,
+	i.type_desc AS index_type,
+	crgp.partition_number,
+	100 * (ISNULL(crgp.partition_deleted_rows + ISNULL(cip.delete_buffer_rows, 0), 0)) / NULLIF(crgp.partition_total_rows, 0) AS avg_fragmentation_in_percent
+FROM sys.indexes i
+INNER JOIN CTE_columnstore_row_group_partition AS crgp ON i.object_id = crgp.object_id AND i.index_id = crgp.index_id
+LEFT OUTER JOIN CTE_columnstore_internal_partition AS cip ON i.object_id = cip.object_id AND i.index_id = cip.index_id AND crgp.partition_number = cip.partition_number
+ORDER BY schema_name, object_name, index_name, partition_number, index_type;
+
+
+
+
+-- 5C: HEAP MAINTENANCE
+-- 1. Heap fragmentation
+--	+ Increasing as many data modifications performed, especially update/delete operations could cause gaps on pages.
+--	+ If the gap space is insufficient for new added data, it create index pointer to the new location of that data.
+--	+ If a record is updated with larger size data that exceeds the allocated space, it also create a new index pointer.
+--	+ Index pointer could reduce read performance since server has to traverse through pointer to get the real required data.
