@@ -152,7 +152,8 @@ REBUILD WITH (
 	IGNORE_DUP_KEY = ON,
 	ALLOW_PAGE_LOCKS = ON,
 	ALLOW_ROW_LOCKS = ON,
-	SORT_IN_TEMPDB = ON
+	SORT_IN_TEMPDB = ON,
+	DATA_COMPRESSION = PAGE -- ROW
 	-- ONLINE = ON -- only available on Enterprise edition of SQL Server or Azure SQL Edge
 )
 -- ===================================================================================================
@@ -529,12 +530,13 @@ GO
 -- 3. In columnstore index, fragmentation is defined as the ratio of deleted rows to total rows
 -- 4. Implement Index Reorganize and Rebuild operation to reduce index fragmentation and increase page density.
 --	+ Reorganize rowstore index is physically reorder the leaf-level pages, and compacts index page to the fill factor of the index
---	+ Reorganize columnstore index forces delta store rows goups into compressed larger row groups which reduce the number of groups, this cost CPU resource to cpmress data
---	+ Rebuild an index will drop and re-create the whole index tree, which cost more resource comapred to Reorganize
---	+ Rebuild rowstore index removes fragmentation in all levels of index, rebuild can be performed on a single index to all indexes at once
+--	+ Reorganize columnstore index forces delta store rows goups into larger compressed row groups which reduce the number of groups, this cost CPU resource to compress data
+--	+ Rebuild an index will drop and re-create the whole index tree, which cost more resource compared to Reorganize
+--	+ Rebuild rowstore index removes fragmentation in all levels of index, rebuild can be performed on a single index, some indexes or on all indexes at once
 --	+ Rebuild a columnstore index removed fragmenatation, and moves any delta store rows into columnstore
+--	+ Rebuild index also update statistics to the current state
 
--- MEASURE INDEX FRAGMENTATION AND PAGE DENSITY
+-- MEASURE ROWSTORE INDEX FRAGMENTATION AND PAGE DENSITY
 SELECT 
 	'' AS [Rowstore index fragmentation],
 	DB_NAME(ips.database_id) AS [database name],
@@ -545,13 +547,14 @@ SELECT
 	ips.page_count AS [page count],
 	FORMAT(ips.avg_fragmentation_in_percent, '##0.###') + '%' AS [avg fragmentation percent],
 	ISNULL(ips.fragment_count, 0) AS [fragment count],
-	FORMAT(ips.avg_page_space_used_in_percent, '##0,###') + '%'  AS [avg page space used],
-	ISNULL(ips.avg_fragment_size_in_pages, 0)  AS [avg page density],
-	ips.alloc_unit_type_desc AS [alloc unit type]
-FROM sys.dm_db_index_physical_stats(DB_ID('AE21_VanPhat_CongNghiep'), NULL, NULL, NULL, NULL) ips
+	ISNULL(ips.avg_fragment_size_in_pages, 0) AS [avg fragment size],
+	FORMAT(ips.avg_page_space_used_in_percent, '##0.###') + '%'  AS [page density]
+FROM sys.dm_db_index_physical_stats(DB_ID('AdventureWorks2025'), NULL, NULL, NULL, 'DETAILED') ips
 INNER JOIN sys.indexes idx ON idx.object_id = ips.object_id AND idx.index_id = ips.index_id
-ORDER BY [avg fragmentation percent] DESC
-;
+ORDER BY ips.avg_fragmentation_in_percent DESC
+GO
+
+-- MEASURE COLUMNSTORE INDEX FRAGMENTATION
 WITH CTE_columnstore_row_group_partition AS (
 	SELECT 
 		object_id,
@@ -583,9 +586,33 @@ SELECT
 FROM sys.indexes i
 INNER JOIN CTE_columnstore_row_group_partition AS crgp ON i.object_id = crgp.object_id AND i.index_id = crgp.index_id
 LEFT OUTER JOIN CTE_columnstore_internal_partition AS cip ON i.object_id = cip.object_id AND i.index_id = cip.index_id AND crgp.partition_number = cip.partition_number
-ORDER BY schema_name, object_name, index_name, partition_number, index_type;
+ORDER BY schema_name, object_name, index_name, partition_number, index_type
+GO
+;
 
+-- REORGANIZE AN INDEX (if fragmentation <= 60%)
+ALTER INDEX AK_Employee_NationalIDNumber
+ON HumanResources.Employee
+REORGANIZE;
 
+-- REBUILD AN INDEX (if fragmentation > 60%)
+ALTER INDEX PK_WorkOrderRouting_WorkOrderID_ProductID_OperationSequence
+ON Production.WorkOrderRouting
+REBUILD
+
+SELECT 
+	DB_NAME(ips.database_id) AS [database name],
+	ISNULL(OBJECT_SCHEMA_NAME(ips.object_id, ips.database_id), '') + '.' + ISNULL(OBJECT_NAME(ips.object_id, ips.database_id), '') AS [table name],
+	ips.index_type_desc AS [index type],
+	ips.alloc_unit_type_desc AS [unit type],
+	ips.page_count AS [page count],
+	FORMAT(ips.avg_fragmentation_in_percent, '##0.###') + '%' AS [avg fragmentation percent],
+	ISNULL(ips.fragment_count, 0) AS [fragment count],
+	ISNULL(ips.avg_fragment_size_in_pages, 0) AS [avg fragment size],
+	FORMAT(ips.avg_page_space_used_in_percent, '##0.###') + '%'  AS [page density]
+FROM sys.dm_db_index_physical_stats(DB_ID('AdventureWorks2025'), OBJECT_ID('Production.WorkOrderRouting'), NULL, NULL, 'LIMITED') ips
+ORDER BY ips.avg_fragmentation_in_percent DESC
+GO
 
 
 -- 5C: HEAP MAINTENANCE
