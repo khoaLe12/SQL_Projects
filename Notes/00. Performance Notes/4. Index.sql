@@ -106,6 +106,16 @@ EXEC sp_helpindex 'dbo.Table_primarykey'
 -- 5. SET to ON:
 --	+ The sort runs are stored in other set of disks, help to seperate the process of disk read/write between sort runs and base table's data files
 --	+ The disk reads of data page generally continue more serially, also the disk writes to tempdb are generally serial, as do the writes of final index
+-- ================================================================================================================================================================
+-- MAXDOP
+-- 1. Specify the max degree of parallelism when CREATE/ALTER/FROP an index
+-- 2. High value of MAXDOP could be resource intensive (more CPUs and memory used)
+-- ================================================================================================================================================================
+-- COMPRESS_ALL_ROW_GROUPS
+-- 1. Used for Reorganizing a columnstore index
+-- 2. It force all open delta groups into compressed columnstore format
+-- 3. A replacement approach for resource-intensive index rebuild
+
 
 
 
@@ -153,8 +163,15 @@ REBUILD WITH (
 	ALLOW_PAGE_LOCKS = ON,
 	ALLOW_ROW_LOCKS = ON,
 	SORT_IN_TEMPDB = ON,
-	DATA_COMPRESSION = PAGE -- ROW
+	DATA_COMPRESSION = PAGE, -- ROW
+	MAXDOP = 8,
+	COMPRESS_ALL_ROW_GROUPS = ON
 	-- ONLINE = ON -- only available on Enterprise edition of SQL Server or Azure SQL Edge
+)
+;
+ALTER INDEX Idx_table_summary_name_country ON sc2.table_summary
+REORGANIZE WITH (
+	COMPRESS_ALL_ROW_GROUPS = ON
 )
 -- ===================================================================================================
 
@@ -473,6 +490,36 @@ CREATE NONCLUSTERED INDEX Idx_Table_computedcolumn_nonprecise2 ON sc2.Table_comp
 
 
 
+-- 4A: COLUMNSTORE INDEXES
+-- 1. Columnstore index is a column-based data storage which physically store data in a column-wise format, and logically organized as a table with rows
+-- 2. This structure effectively compress data up to 10 times smaller compared to uncompress one
+-- 3. The index can gains up to 10 times the query performance, especially for big data
+-- 4. It could intensively consume CPUs to decompress data when read
+-- 5. A columnstore table
+--	+ Is sliced into multiple rowgroups
+--	+ Each rowgroup contains a list of compressed column segments
+--	+ Each column segment represents a column of the table
+-- 6. To reduce fragmentation, the columnstore index uses other clustured index called deltastore to temporarily store deleted rows
+-- 7. To improve compression and performance, the index uses delta rowgroup/deltastore
+--	+ Delta rowgroup is a clustered B-tree index used to store data in a rowstore structure
+--	+ Deltastore is a group of delta rowgroups
+--	+ The deltastore helps to load small of data before compress (when the data reach at least 102400 rows) and move it into the columnstore
+--	+ Implement Rebuild/Reorganize to completely remove and move deltastore to columnstore
+-- 8. The columnstore is ideal for data warehousing, real-time analytics workloads, or any workload that insert large volumnes of data with minimal updates/deletes (like IoT):
+--	+ Significantly reduce data storage cost, reduce I/O cost
+--	+ Reduce memory usage
+--	+ Best practice if query often select a few columns, and require scanning large range of values
+-- 9. Don't use clustured columnstore index when
+--	+ The table requires VARCHAR(MAX), NVARCHAR(MAX) or VARBINARY(MAX) data types.
+--	+ The table has less than one million rows per partition.
+--	+ More than 10% of the operations on the table are updates and deletes
+-- 10. Choose the appropriate data compression method
+--	+ Use columnstore compression for best query performance
+--	+ Use archive compression for best data compression
+
+
+
+
 
 
 
@@ -530,10 +577,10 @@ GO
 -- 3. In columnstore index, fragmentation is defined as the ratio of deleted rows to total rows
 -- 4. Implement Index Reorganize and Rebuild operation to reduce index fragmentation and increase page density.
 --	+ Reorganize rowstore index is physically reorder the leaf-level pages, and compacts index page to the fill factor of the index
---	+ Reorganize columnstore index forces delta store rows goups into larger compressed row groups which reduce the number of groups, this cost CPU resource to compress data
+--	+ Reorganize columnstore index forces deltastore rows goups into larger compressed row groups which reduce the number of groups, this cost CPU resource to compress data
 --	+ Rebuild an index will drop and re-create the whole index tree, which cost more resource compared to Reorganize
 --	+ Rebuild rowstore index removes fragmentation in all levels of index, rebuild can be performed on a single index, some indexes or on all indexes at once
---	+ Rebuild a columnstore index removed fragmenatation, and moves any delta store rows into columnstore
+--	+ Rebuild a columnstore index removed fragmenatation, and moves any deltastore rows into columnstore
 --	+ Rebuild index also update statistics to the current state
 
 -- MEASURE ROWSTORE INDEX FRAGMENTATION AND PAGE DENSITY
@@ -593,7 +640,7 @@ GO
 -- REORGANIZE AN INDEX (if fragmentation <= 60%)
 ALTER INDEX AK_Employee_NationalIDNumber
 ON HumanResources.Employee
-REORGANIZE;
+REORGANIZE
 
 -- REBUILD AN INDEX (if fragmentation > 60%)
 ALTER INDEX PK_WorkOrderRouting_WorkOrderID_ProductID_OperationSequence
