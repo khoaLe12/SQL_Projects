@@ -1,4 +1,4 @@
--- TABLE OF CONTENT
+﻿-- TABLE OF CONTENT
 -- 1A: TYPES OF INDEX
 -- 1B: PHASES OF INDEX BUILDING
 -- 1C: INDEX OPTIONS
@@ -10,6 +10,10 @@
 -- 3E: FILTERED INDEX
 -- 3F: WITH INCLUDED COLUMNS
 -- 3G: INDEX ON COMPUTED COLUMNS
+-- 3H: COLUMNSTORE INDEXES
+-- 5A: TUNE NONCLUSTERED INDEXES
+-- 5B: INDEX MAINTENANCE
+-- 5C: HEAP MAINTENANCE
 
 
 USE SQLTestDB;
@@ -23,18 +27,44 @@ EXEC sp_helpindex 'dbo.Table_primarykey'
 
 
 
+
 -- 1A: TYPES OF INDEX
--- 1. Hash index: build a hash table in memory provide an effective way to access data through hash value
--- 2. Memory-optimized Nonclutered index: 
--- 3. Clustered index: sorts and stores the data physically in order based on the clustered index key.
--- 4. Nonclustered index: sorts the data logically based on the non-clustered index key
--- 5. Unique index: Ensure no duplicate values
--- 6. Columnstore index: Compress and store data using column-based data storage, best use case for bulk load and read-only queries
--- 7. Filtered index: An optimized nonclustered index, could improve query performance, reduce index storage costs and index maintenance costs
--- 8. Spatial index: Perform certain operations more efficiently on spatial objects
--- 9: Full-text index: Token-based functional index that is built and maitained by Microsoft Full-Text Engine
--- 10: Index with included columns: A nonclustered index that is extended to include nonkey columns, help to avoid the lookup operations
--- 11: Index on computed columns: An index on a column that is derived from the value of one or more other columns
+-- 1. Hash index
+--	+ Builds a hash table in memory for memory-optimized tables.
+--	+ Provides fast access using hash values.
+--	+ Best suited for point lookup and equality predicates.
+-- 2. Memory-Optimized Nonclustered Index
+--	+ In-memory index for memory-optimized tables.
+--	+ Supports a wide range of queries.
+--	+ Generally recommended over hash indexes.
+-- 3. Clustered Index
+--	+ Physically sorts and stores table data based on the clustered index key.
+--	+ Each table can have only one clustered index.
+-- 4. Nonclustered Index
+--	+ Maintains a logical ordering of data based on the index key.
+--	+ Stores pointers to the actual data rows.
+-- 5. Unique Index
+--	+ Ensures that no duplicate values exist in the indexed column(s).
+--	+ Enforces uniqueness constraints.
+-- 6. Columnstore Index
+--	+ Store data in a compressed, column-based format.
+--	+ Optimized for analytics, bulk loads, and read-heavy queries.
+-- 7. Filtered Index
+--	+ A specialized nonclustered index built on a subset of rows.
+--	+ Improves query performance and reduces storage/maintenance costs.
+-- 8. Spatial Index
+--	+ Designed for spatial data types (geometry, geography).
+--	+ Enables efficient spatial queries and operations.
+-- 9. Full-Text Index
+--	+ Token-based functional index managed by the Full-Text Engine.
+--	+ Supports advanced text search capabilities (phrases, inflectional forms, synonyms).
+-- 10. Index with included columns
+--	+ A nonclustered index extended with non-key columns.
+--	+ Helps avoid costly lookups by covering queries.
+-- 11. Index on Computed Columns
+--	+ Built on columns derived from expression or other columns.
+--	+ Useful for indexing calculated values.
+
 
 
 
@@ -47,7 +77,7 @@ EXEC sp_helpindex 'dbo.Table_primarykey'
 --	2. Retrieved entries are placed into internal sort buffers until the buffers are full.
 --	3. When a buffer fills, its content are sorted and written to disk as an intermediate "sort run".
 --	4. This process repeats untill all rows of the base table have been processed into sort runs.
--- Phas 2: Merge and index tree construction
+-- Phase 2: Merge and index tree construction
 --	1. SQL Server reads the first page from each "sort run".
 --	2. It repeatedly selects the lowest key among all active pages and writes that entry to the new index leaf page.
 --		+ As leaf pages are filled, upper levels of the B-Tree are built simultaneously.
@@ -59,47 +89,49 @@ EXEC sp_helpindex 'dbo.Table_primarykey'
 
 
 
-
 -- 1C: INDEX OPTIONS
 -- ================================================================================================================================================================
--- FILLFACTOR: (VALUE OF 70 MEANS 70% OF TAKEN SPACE AND 30% OF FREE SPACE (REMAINDER))
--- 1. Determine the percentage of space on each leaf-level page to be filled, reserving the remainder on each page as free space for future growth
--- 2. The empty space is reserved at the end of each page -> increase size of page -> minimize page splits caused by extra length added/updated
--- 3. If data is always added to the end of the table (sequential insert/increasing key), the fill factor of 100 (0 is as same as 100) or small of remainder is recommended, since adding new row wont cause page split
--- 4. Lower fill factor -> require more space, increase number of pages -> decrease read performance since more pages needed to read
--- 5. Can only be used with CREATE INDEX or ALTER INDEX REBUILD WITH
+-- FILLFACTOR:
+-- 1. Specifies the percentage of space to fill on each leaf-level page, leaving the remainder as free space for future growth.
+-- 2. Example: FILLFACTOR = 70 → 70% filled, 30% free.
+-- 3. Reserved free space helps minimize page splits during inserts/updates.
+-- 4. For sequential inserts (e.g, increasing keys), a fill factor of 100 (or 0, which is equivalent) is recommended since new rows won't cause page splits.
+-- 5. Lower fill factors increase page count, which can reduce read performance.
+-- 6. Applicable only with CREATE INDEX or ALTER INDEX ... REBUILD.
 -- ================================================================================================================================================================
 -- PAD_INDEX
--- 1. Set ON to apply FILLFACTOR to the non-leaf index pages
--- 2. Used with option FILLFACTOR
+-- 1. When set to ON, applies the FILLFACTOR setting to non-leaf index pages as well.
+-- 2. Must be used together with FILLFACTOR.
 -- ================================================================================================================================================================
 -- DROP_EXISTING
--- 1. Set ON to drop existing index then create/rebuild index
--- 2. Used with ALTER INDEX statement
+-- 1. When set to ON, drops the existing index before creating or rebuilding it.
+-- 2. Used with ALTER INDEX.
 -- ================================================================================================================================================================
 -- STATISTICS_NORECOMPUTE
--- 1. Set ON to turn off automatic statistics update
+-- 1. When set to ON, disable automatic statistics updates for the index.
+-- 2. Useful when you want to manually controls statistics maitenance.
 -- ================================================================================================================================================================
 -- IGNORE_DUP_KEY
--- 1. Set ON to ignore duplicate keys. SET OFF to not allow duplicate keys, if there is duplication -> insert operation fails, data is rolled back
--- 2. Can not be set to ON for primary key constraint, unique constraint, view, nonunique indexes, XML indexes, spatial indexes, and filtered indexes
+-- 1. When set to ON, duplicate key insert attempts are ignored (the row is discarded)
+-- 2. When set to OFF, duplicate key inserts fail and the transaction is rolled back.
+-- 3. Cannot be enabled for primary key constraints, unique constraints, views, non-unique indexes, XML indexes, spatial indexes, or filtered indexes.
 -- ================================================================================================================================================================
 -- ONLINE
--- 1. Set ON to prevent long-term table locks during building index
--- 2. Only available on Enterprise edition of SQL Server or Azure SQL Edge
+-- 1. When set to ON, allows index operations without long-term table locks.
+-- 2. Available only in Enterprise Edition or Azure SQL Edge
 -- ================================================================================================================================================================
 -- ALLOW_PAGE_LOCKS & ALLOW_ROW_LOCKS
--- 1. Control SQL Server Database Engine to use page-level locks, row-level lock or not
--- 2. There are 3 locking strategies: row-level lock, page-level lock, table-level lock
--- 3. The rate of blocking/deadlocks occurrences in descending order: table-level -> page-level -> row-level
--- 4. The level of data consistency in descending order: table-level, page-level, row-level
--- 5. Best pratice: keep these options as default (ON) so SQL Server can have more options of locking strategy
--- 6. Modify it with careful consideration, through monitoring and clear evidance
+-- 1. Control whether SQL Server can use page-level or row-level locks.
+-- 2. Locking strategies: row-level, page-level, table-level.
+-- 3. Blocking/dealock likelihood (highest → lowest): table-level → page-level → row-level.
+-- 4. Data consistency (highest → lowest): table-level, page-level, row-level.
+-- 5. Best pratice: keep defaults (ON) to allow SQL Server flexibility.
+-- 6. Modify only with careful monitoring and evidence.
 -- ================================================================================================================================================================
 -- SORT_IN_TEMPDB
--- 1. Used to direct the SQL Server to use tempdb to store the intermediate sort results or not
+-- 1. Determines whether intermediate sort results are stored in tempdb during index creation/rebuild.
 -- 2. This options increases the amount of disk space used, but could potentially reduce time to create or rebuild index
--- 3. Could configure "index create memory" option to tell SQL Server use memory instead of disk help reduce I/O cost (see "Server configuration: index create memory"), work for both ON and OFF
+-- 3. Can be combined with the "index create memory" option to reduce I/O costs.
 -- 4. SET to OFF by default:
 --	+ The sort runs are stored in the same location of base table's file group
 --	+ During the index building, SQL server has to change between disk read and disk write, and move the disk heads between sort runs area and data page area, and index page area
@@ -108,13 +140,13 @@ EXEC sp_helpindex 'dbo.Table_primarykey'
 --	+ The disk reads of data page generally continue more serially, also the disk writes to tempdb are generally serial, as do the writes of final index
 -- ================================================================================================================================================================
 -- MAXDOP
--- 1. Specify the max degree of parallelism when CREATE/ALTER/FROP an index
--- 2. High value of MAXDOP could be resource intensive (more CPUs and memory used)
+-- 1. Specifies the maximum number of CPUs used for index operations (CREATE, ALTER, DROP, maintenance).
+-- 2. Higher values can improve speed but may consume significant CPU and memory resources.
 -- ================================================================================================================================================================
 -- COMPRESS_ALL_ROW_GROUPS
--- 1. Used for Reorganizing a columnstore index
--- 2. It force all open delta groups into compressed columnstore format
--- 3. A replacement approach for resource-intensive index rebuild
+-- 1. Used when reorganizing a columnstore index.
+-- 2. Forces all open delta groups into compressed columnstore format.
+-- 3. Provides a lighter alternative to full index rebuilds.
 
 
 
@@ -130,22 +162,20 @@ CREATE TABLE sc2.table_summary (
 	[country] Nvarchar(50) NOT NULL DEFAULT '',
 	CONSTRAINT PK_table_summary PRIMARY KEY (id)
 )
-
+;
 -- Filterd unique nonclustered index1 with included columns
 DROP INDEX IF EXISTS Idx_table_summary_name_vn ON sc2.table_summary
 CREATE UNIQUE NONCLUSTERED INDEX Idx_table_summary_name_vn ON sc2.table_summary([name])
 INCLUDE ([Address], [country])
 WHERE [country] = 'Vietnam'
--- ===================================================================================================
-
+;
 -- Filterd unique nonclustered index2 with included columns
 DROP INDEX IF EXISTS Idx_table_summary_name_us ON sc2.table_summary
 CREATE UNIQUE NONCLUSTERED INDEX Idx_table_summary_name_us ON sc2.table_summary([name])
 INCLUDE ([Address], [country])
 WHERE [country] = 'USA'
--- ===================================================================================================
-
--- index with some options
+;
+-- Index with some options
 DROP INDEX IF EXISTS Idx_table_summary_name_country ON sc2.table_summary
 CREATE UNIQUE NONCLUSTERED INDEX Idx_table_summary_name_country ON sc2.table_summary([name], [country])
 WITH (
@@ -173,17 +203,13 @@ ALTER INDEX Idx_table_summary_name_country ON sc2.table_summary
 REORGANIZE WITH (
 	COMPRESS_ALL_ROW_GROUPS = ON
 )
--- ===================================================================================================
-
+;
 -- Disable and enable index
 ALTER INDEX Idx_table_summary_name_country ON sc2.table_summary DISABLE
-;
 ALTER INDEX Idx_table_summary_name_country ON sc2.table_summary REBUILD
-;
 CREATE INDEX Idx_table_summary_name_country ON sc2.table_summary([name], [country])
 WITH (DROP_EXISTING = ON)
--- ===================================================================================================
-
+;
 -- See properties of all the indexes in a table
 SELECT 
 	i.name AS index_name,
@@ -205,27 +231,20 @@ FROM sys.indexes i
 INNER JOIN sys.data_spaces AS ds ON i.data_space_id = ds.data_space_id
 WHERE i.is_hypothetical = 0 AND i.index_id <> 0
 	AND i.[object_id] = OBJECT_ID('sc2.table_summary')
--- ===================================================================================================
-
-
-
-
-
-
-
-
-
 
 
 
 
 
 -- 3A: HEAP TABLE:
--- 1. A table without clustrered index -> The row is inserted with no order, and the data is retrieved from heap in order of data pages be default
--- 2. Use heap with non-clustered index to strengthen both read and write process
--- 3. Heap is not ideal if the data is frequently updated, it could cause fragmentation (forwarded record pointing) -> can incur additional I/O
--- 4. Each row of heap is identified by a reference of 8-byte row identifier (RID)
--- Create heap table using ddl and select statement
+-- 1. A heap is a table without a clustered index.
+--	+ Rows are inserted without any defined order.
+--	+ By default, data is retrieved in the order of data pages, not by logical sequence.
+-- 2. Heap can be combined with nonclustered indexes to improve both read and write performance.
+-- 3. Heaps are not ideal for frequently updated data because updates can cause fragmentation.
+--	+ Forwarded records (row relocation with pointers) may occur, leading to additional I/O overhead.
+-- 4. Each row in a heap is identified by an 8-byte Row Identifier (RID), which points to the physical location of the row.
+
 -- Check index types of all tables, index_id = 0 -> heap, index_id = 1 -> clustered index
 DROP TABLE IF EXISTS sc2.Heap1
 CREATE TABLE sc2.Heap1 (
@@ -237,105 +256,102 @@ DROP TABLE IF EXISTS sc2.Heap2
 SELECT * INTO sc2.Heap2 FROM dbo.SQLTest
 ;
 SELECT 
-	t.name AS 'Your TableName',
-	s.name AS 'Your SchemaName',
-	p.rows AS 'Number of Rows in Your Table',
-	SUM(a.total_pages) * 8 AS 'Total Space of Your Table (KB)',
-    SUM(a.used_pages) * 8 AS 'Used Space of Your Table (KB)',
-    (SUM(a.total_pages) - SUM(a.used_pages)) * 8 AS 'Unused Space of Your Table (KB)',
+	CONCAT(s.name, '.', t.name) AS [table],
+	p.rows AS [rows count],
+	RTRIM(CAST(ISNULL(SUM(a.total_pages) * 8, 0) AS Char)) + ' KB' AS [total space],
+    RTRIM(CAST(ISNULL(SUM(a.used_pages) * 8, 0) AS Char)) + ' KB' AS [used space],
+    RTRIM(CAST(ISNULL((SUM(a.total_pages) - SUM(a.used_pages)) * 8, 0) AS Char)) + ' KB' AS [unused space],
     CASE 
-        WHEN i.index_id = 0
-            THEN 'Yes'
+        WHEN i.index_id = 0 THEN 'Yes'
         ELSE 'No'
-        END AS 'Is Your Table a Heap?'
+   END AS [Is table a Heap?]
 FROM sys.tables t
 INNER JOIN sys.indexes i ON t.object_id = i.object_id
 INNER JOIN sys.partitions p ON t.object_id = p.object_id AND i.index_id = p.index_id
 INNER JOIN sys.allocation_units a ON p.partition_id = a.container_id
 LEFT JOIN sys.schemas s ON t.schema_id = s.schema_id
-WHERE i.index_id <= 1
+WHERE i.index_id = 2 -- 0 → Heap, 1 → Clustered index, 2 → Nonclustered index
 GROUP BY t.name,
 	s.name,
 	i.index_id,
 	p.rows
-ORDER BY 'Your TableName';
-
-
-
-
+ORDER BY [table];
 
 
 
 
 
 -- 3B: CLUSTERED INDEX
--- 1. A clustered table can only have exactly one clustered index, since the data rows can only be physically stored in only one order
--- 2. The table's data file contains additional page called index page
--- 3. The index pages of rowstore index store keys in a hierarchical structure called Balance Tree or B+ Tree 
--- 4. The index tree has 3 main parts are: root node, intermediate nodes and leaf nodes. Which the leaf node is the actual data pages that are referenced by index page of intermediate nodes
--- 5. Since the data rows are sorted by index keys, the intermediate nodes only have to reference to appropriate data pages by its page id instead of directly locating the data rows
--- 6. For each modification of the table data, the index tree could be redefined to maintain its balance property -> which could make INS/UPD/DEL be less effective if the tree is big
--- 7. The table is automatically created with a clustered index if it is defined with PRIMARY KEY
--- 8. Generally, searching the index is much faster than searching the table, since an index frequently contains very few columns per row and the rows are in sorted order
--- Create index using PRIMARY KEY CONSTRAINT, or with CREATE index statement
+-- 1. A table can have only one clustered index, because rows can be physically stored in only one order.
+-- 2. The clustered index organizes data pages and index pages into B+ Tree structure.
+-- 3. The B+ Tree has three main components:
+--	+ Root node
+--	+ Intermediate (non-leaf) nodes
+--	+ Leaf nodes (which are actual data pages)
+-- 4. Leaf nodes contain the table's data rows, while intermediate nodes store index keys and pointers (page IDs) to lower-level pages.
+-- 5. Because rows are sorted by the clustered index key, intermediate nodes only need to reference the correct data pages rather than individual rows.
+-- 6. When data is inserted, updated, or deleted, the index tree may be rebalanced to maintain efficiency. On large trees, this can make modifications slower compared to a heap table.
+-- 7. By default, if a PRIMARY KEY is defined on a table, SQL Server automatically creates a clustered index on that column (unless specified otherwise).
+-- 8. Searching via the clustered index is generally faster than scanning the entire table, since the index is ordered and usually narrower than the full row.
+-- 9. Clustered indexes can be created either through a PRIMARY KEY constraints or explicitly with a CREATE CLUSTERED INDEX statement.
+
+-- Example: Clustered index created via PRIMARY KEY
 DROP TABLE IF EXISTS sc2.Table_primarykey
 CREATE TABLE sc2.Table_primarykey (
 	id Nvarchar(50) NOT NULL DEFAULT '',
 	CONSTRAINT PK_Table_primarykey PRIMARY KEY (id)
-)
-;
-DROP TABLE IF EXISTS Table_clusteredindex ON sc2.Table_clusteredindex
+);
+
+-- Example: Clustered index created explicitly
+DROP TABLE IF EXISTS sc2.Table_clusteredindex
 CREATE TABLE sc2.Table_clusteredindex (
 	id Nvarchar(50) NOT NULL DEFAULT ''
-)
-;
+);
+
 DROP INDEX IF EXISTS Idx_Table_clusteredindex_id ON sc2.Table_clusteredindex
 CREATE CLUSTERED INDEX Idx_Table_clusteredindex_id ON sc2.Table_clusteredindex(id)
-WITH (ONLINE = ON) -- consider setting ONLINE to ON to prevent long-term table locks during building index
 
 
 
 
 
+-- 3C: NONCLUSTERED INDEX
+-- 1. A table can have multiple nonclustered indexes, because rows can be logically organized in many different orders.
+-- 2. A nonclustered index also use a B+ Tree structure. Howerver, at the leaf level it does not contain the actual data rows.
+-- 3. Instead, leaf nodes contain row locators:
+--	+ On a heap table (no clustered index), the locator is a Row ID (RID) pointing directly to the physical row.
+--	+ On a clustered table, the locator is the clustered index key, which is used to find the actual row in the clustered index.
+-- 4. Because leaf nodes store locators rather than data rows, nonclustered indexes are typically larger than clustered indexes.
+-- 5. A UNIQUE constraint automatically creates a nonclustered index (unless a clustered index is explicitly specified).
+-- 6. Nonclustered indexes can be created either via a UNIQUE constraints or explicitly with a CREATE NONCLUSTERED INDEX statement.
 
-
-
-
-
-
--- 3C: NONCLUSTERED INDEX (MOSTLY SAME AS CLUSTERED INDEX)
--- 1. A nonclustered table can have one or many nonclustered indexs, since the data rows can be logically sorted in many order
--- 2. In the balance tree, instead of having data page at the leaf node, it has additional index pages define row locators
--- 3. For heap table, the row locator contains RIDs point to the actual rows. For clustered table, it stores clustered keys point to data page instead
--- 3. Because the leaf nodes are replaced by additional index pages, the size of nonclustered index are slightly larger than clustered index
--- 4. The table automatically has a nonclustured index if it created with a UNIQUE constraint
--- Create index using UNIQUE CONSTRAINT, or with CREATE index statement
+-- Example: Nonclustered index created via UNIQUE constraint
 DROP TABLE IF EXISTS sc2.Table_uniquecol
 CREATE TABLE Table_uniquecol (
-	id Nvarchar(50) NOT NULL UNIQUE,
-)
-;
+	id Nvarchar(50) NOT NULL UNIQUE, -- creates nonclustered index by default
+);
+
+-- Example: Explicit nonclustered index
 DROP TABLE IF EXISTS sc2.Table_nonclusteredindex
 CREATE TABLE sc2.Table_nonclusteredindex (
 	id Nvarchar(50)
-)
-;
+);
+
 DROP INDEX IF EXISTS Idx_Table_nonclusteredindex_id ON sc2.Table_nonclusteredinde
 CREATE NONCLUSTERED INDEX Idx_Table_nonclusteredindex_id ON sc2.Table_nonclusteredindex(id)
-WITH (ONLINE = OFF)
-
-
-
-
-
 
 
 
 
 
 -- 3D: UNIQUE INDEX
--- 1. A unique index guarantees the index key cotains no duplicate values
--- 2. It has an option of ingnoring duplicate keys, if yes -> ignore duplicate keys, if no -> the entire insert operation fails and the data is rolled back
+-- 1. A unique index enforces uniqueness: the index key cannot contain duplicate values.
+-- 2. The IGNORE_DUP_KEY option controls behavior when duplicate keys are inserted:
+--	+ ON → Duplicate rows are ignored; the insert continues for non-duplicates.
+--	+ OFF → The entire insert operation fails and is rolled back if duplicates exist.
+-- 3. Unique indexes can be clustered or nonclustered, depending on how they are defined.
+
+-- Example: unique clustered index with IGNORE_DUP_KEY = ON/OFF
 IF EXISTS (SELECT * FROM sys.indexes WHERE name = N'Idx_Table_clusteredindex_id' AND object_id = OBJECT_ID(N'sc2.Table_clusteredindex', N'U'))
 	DROP INDEX Idx_Table_clusteredindex_id ON sc2.Table_clusteredindex
 CREATE UNIQUE CLUSTERED INDEX Idx_Table_clusteredindex_id ON sc2.Table_clusteredindex(id)
@@ -350,26 +366,24 @@ WITH (IGNORE_DUP_KEY = OFF)
 
 
 
+-- 3E: FILTERED INDEX
+-- (Note: Cannot be applied to PRIMARY KEY, UNIQUE constraints, or clustered index)
+-- 1. A filtered index is a disk-based, rowstore nonclustered index.
+-- 2. It uses a filter predicate to index only a subset of rows in the table.
+-- 3. A well-designed filtered index can improve query performance while reducing maintenance and storage costs.
+-- 4. Filtered indexes provide more accurate statistics for the subset of data, which can improve execution plans and query performance.
+-- 5. Because they cover fewer rows, filtered index are smaller than full-table indexes, reducing the impact of data modifications and lowering maintenance overhead.
+-- 6. Their smaller size also reduces disk storage requirements.
+-- 7. Filtered indexes support only simple comparison operators; they do not support LIKE.
+-- 8. Data conversion functions are only allowed on the right-hand side of the comparison operator in the filter expression.
+-- 9. Computed columns cannot be referenced in the filtered definition.
+-- 10. In some cases, it may be beneficial to create multiple filtered nonclustered indexes for different states of data rather than a single full nonclustered index.
+-- 11. Design considerations:
+--	+ Use filtered indexes on subsets of data frequently queried (e.g., NOT NULL vlaues).
+--	+ Create filtered indexes for specific states in a status column (e.g., workflow stages).
+--	+ Create filtered indexes based on categories of data.
 
-
-
-
-
--- 3E: FILTERED INDEX (can't be aplied to PRIMARY KEY or UNIQUE CONSTRAINT, or with CLUSTERED INDEX)
--- 1. A filtered index is an optimized disk-based rowstore nonclustered index
--- 2. It uses a filter predicate to index a portion of rows in the table
--- 3. A well-designed filtered index can improve query performance and reduce index maintenance and storage cost
--- 4. It has more accurate statistics comparing to full-table statistics -> improve execution plan quality -> improve query performance
--- 5. It reduce the size of index tree, and is smaller than full-table index -> reduce the affected range of data modification -> reduce index maintenance costs and statistics update cost
--- 6. It has smaller size -> reduce disk storage
--- 7. Filtered index only support simple comparison operators and don't support LIKE operators
--- 8. The data conversion operators only be allowed on the right side of the comparison operator in the filter expression
--- 9. Computed column can't be reference in the filter definition
--- 10. Sometimes it may be a good pratice to crate multiple filtered nonclustered indexes instead of single nonclustered index
--- 11. Design consideration: 
--- + Create filtered index on subset of data that is frequently queried (if null values are not required on query condition -> indexed for NOT NULL values instead of both NULL and NOT NULL)
--- + Create filtered index for each state listed in a column represent progress of something
--- + Create filtered index base on categories of data
+-- Example table
 DROP TABLE IF EXISTS sc2.Table_filteredindex
 CREATE TABLE sc2.Table_filteredindex (
 	id Nvarchar(50) NOT NULL,
@@ -400,16 +414,16 @@ CREATE NONCLUSTERED INDEX Table_filteredindex_status3
 
 
 
+-- 3F: WITH INCLUDED COLUMNS (applies only to nonclustered indexes)
+-- 1. A nonclustered index can include nonkey columns to cover more queries.
+-- 2. An index is called a "covering index" if it contains all columns needed by a query.
+-- 3. By including nonkey columns, the query optimizer can retrieve values directly from the index that:
+--	+ No table lookup is required.
+--	+ Data pages are not accessed.
+--	+ So disk I/O operations are reduced.
+-- 4. Including nonkey columns increases the size of the index pages, so design carefully.
 
-
-
-
-
--- 3F: WITH INCLUDED COLUMNS (can only applied with nonclustered index)
--- 1. An index can include nonkey columns that helps to cover more queries
--- 2. An index is called "covering index" if it includes all columns represented in the query
--- 3. With included nonkey columns, query optimizer can quickly locate columns value within index -> table lookup is not performed -> no data pages accessed ->  reduce disk I/O operations
--- 4. Including nonkey columns increases the size of index page
+-- Example table
 DROP TABLE IF EXISTS sc2.Table_nonkeycolumns
 CREATE TABLE sc2.Table_nonkeycolumns (
 	id Nvarchar(50) NOT NULL PRIMARY KEY,
@@ -427,23 +441,20 @@ INCLUDE ([name], [value])
 
 
 
-
-
-
 -- 3G: INDEX ON COMPUTED COLUMNS
 -- To create an index on a computed column, the column must meet several requirements:
 -- 1. Ownership requirements: 
 --		All functions referenced in the computed column expression must be owned by the same user as the table.
--- 3. Determinism requirements: 
+-- 2. Determinism requirements: 
 --		The expression must be deterministic - it must always return the same result for the same input values.
 --		Examples of nondeterministic functions:
 --			+ GETDATE(), NEWID(), RAND() -> values change at different times or calls.
---			+ Aggregate functions (SUM, AVG, etc) -> result depend on data that can change.
+--			+ Aggregate functions (SUM, AVG, etc) -> results depend on data that can change.
 --			+ CAST/CONVERT of string literals to date/time without explicit style codes -> results can vary by LANGUAGE/DATEFORMAT/REGION settings.
 --		Recommendation: use CONVERT with explicit style codes to ensure deterministic behavior.
--- 4. Precision requirements: 
+-- 3. Precision requirements: 
 --		The expression must be precise. FLOAT and REAL data types are considered imprecise, so any computed column involving them cannot be indexed.
--- 5. SET options requirements: 
+-- 4. SET options requirements: 
 --		Certain SET options must be enabled at the connection level when creating or modifying indexes on computed columns:
 --			+ SET NUMERIC_ROUNDABORT OFF
 --			+ SET ANSI_NULLS ON
@@ -489,37 +500,108 @@ CREATE NONCLUSTERED INDEX Idx_Table_computedcolumn_nonprecise2 ON sc2.Table_comp
 
 
 
+-- 3H: COLUMNSTORE INDEXES
+-- 1. Columnstore indexes store data in a coumn-wise format (physically column-based, logically row-organized).
+--	+ Achieve compression up to 10x compared to uncompressed storage.
+--	+ Benefit from compressing column data rather than row data, enabling high compression rates.
+--	+ 
 
--- 4A: COLUMNSTORE INDEXES
 -- 1. Columnstore index is a column-based data storage which physically store data in a column-wise format, and logically organized as a table with rows
--- 2. This structure effectively compress data up to 10 times smaller compared to uncompress one
--- 3. The index can gains up to 10 times the query performance, especially for big data
--- 4. It could intensively consume CPUs to decompress data when read
--- 5. A columnstore table
---	+ Is sliced into multiple rowgroups
---	+ Each rowgroup contains a list of compressed column segments
---	+ Each column segment represents a column of the table
--- 6. To reduce fragmentation, the columnstore index uses other clustured index called deltastore to temporarily store deleted rows
--- 7. To improve compression and performance, the index uses delta rowgroup/deltastore
+--	+ Effectively compress data up to 10 times smaller compared to uncompress one
+--	+ Benefit from compress column data instead of row data, achieving high compression rate
+--	+ Can achieve up to 10 times the query performance, especially for quering large range of values
+--	+ Significantly reduce data storage cost -> reduce I/O cost, but could intensively consume CPUs to decompress data when read
+-- 2. The structure of a columnstore table
+--	+ A table is sliced into multiple rowgroups
+--	+ Each rowgroup contains a list of compressed column segments which each segement represents a column of the table
+--	+ Each column segment is stored in a seperate LoB page as data page
+--	+ The data page consists of 2 parts are Dictionary and Data Stream
+-- 3. To reduce fragmentation, the columnstore index uses other clustured index called deltastore to temporarily identify deleted rows
+--	+ If the number of deleted rows is large enough, Reorganize index to actual delete rows from compressed rows group, and completely remove deltastore, which increased index quality
+-- 4. To improve compression and performance, the index uses delta rowgroup/deltastore
 --	+ Delta rowgroup is a clustered B-tree index used to store data in a rowstore structure
 --	+ Deltastore is a group of delta rowgroups
---	+ The deltastore helps to load small of data before compress (when the data reach at least 102400 rows) and move it into the columnstore
+--	+ The deltastore helps to load small of data before compress (when the data reach at least 102,400 rows) and move it into the columnstore
 --	+ Implement Rebuild/Reorganize to completely remove and move deltastore to columnstore
--- 8. The columnstore is ideal for data warehousing, real-time analytics workloads, or any workload that insert large volumnes of data with minimal updates/deletes (like IoT):
---	+ Significantly reduce data storage cost, reduce I/O cost
---	+ Reduce memory usage
+--	+ Its ideal to do bulk insert to minimize delta rowgroups (the best size is between 102,400 and 1,048,576)
+-- 5. The columnstore is ideal for data warehousing, real-time analytics workloads, or any workload that insert large volumnes of data with minimal updates/deletes (like IoT) as:
+--	+ Significantly reduce data storage cost
+--	+ Reduce memory usage since a small of data is loaded
 --	+ Best practice if query often select a few columns, and require scanning large range of values
--- 9. Don't use clustured columnstore index when
+-- 6. Choose the appropriate data compression method
+--	+ Use columnstore compression for best query performance
+--	+ Use archive compression for best data compression
+-- 7. Don't use clustured columnstore index when
 --	+ The table requires VARCHAR(MAX), NVARCHAR(MAX) or VARBINARY(MAX) data types.
 --	+ The table has less than one million rows per partition.
 --	+ More than 10% of the operations on the table are updates and deletes
--- 10. Choose the appropriate data compression method
---	+ Use columnstore compression for best query performance
---	+ Use archive compression for best data compression
+-- 8. Columnstore performance
+--	+ Column elimination occurs when a query target only some columns, the server will skip reading other columns
+--	+ Rowstore elimination occurs when a query only focus on a specific range of values of a column which represent the nature order (like column "Order date") over time
+--		++ To determine which rows to be eliminated, the index uses metadata consists of maximum and minimum value of each column segement, to identify the range value of that column
 
+-- Define columnstore index
+CREATE TABLE ColumnStoreTable (
+	id Nvarchar(50),
+	name Nvarchar(20),
+	value Int
+)
+CREATE CLUSTERED COLUMNSTORE INDEX Idx_ColumnStoreIndex ON ColumnStoreTable WITH (MAXDOP = 1);
 
+-- Prepare for bulk insert
+WITH CTE_LargeData AS (
+	SELECT 
+		NEWID() AS id,
+		CAST('Name 1' AS Nvarchar) AS name,
+		1 AS value
+	UNION ALL
+	SELECT
+		NEWID(),
+		CAST('Name ' + RTRIM(CAST((value + 1) AS Char)) AS Nvarchar),
+		value + 1
+	FROM CTE_LargeData
+	WHERE value <= 1048577
+)
+SELECT * INTO ##temp FROM CTE_LargeData
+OPTION (MAXRECURSION 0)
+-- ! This require enabling xp_cmdshell, and configuring SQL Server protocol to use SSL/TLS certificate from trusted authorities, and set encryption requirement to be obligatory
+EXEC sys.xp_cmdshell 'bcp "SELECT * FROM ##temp" queryout "D:\Projects\SQL-Projects\Notes\ColumnStoreTable1.csv" -c -t, -r\n -S localhost\SQLEXPRESS -U sa -P Khoa@153426';
+EXEC sys.xp_cmdshell 'bcp "SELECT TOP 102000 * FROM ##temp" queryout "D:\Projects\SQL-Projects\Notes\ColumnStoreTable2.csv" -c -t, -r\n -S localhost\SQLEXPRESS -U sa -P Khoa@153426';
 
+-- Bulk insert 1,048,578 records
+BULK INSERT ColumnStoreTable
+FROM 'D:\Projects\SQL-Projects\Notes\ColumnStoreTable1.csv'
+WITH (
+	FIRSTROW = 1,
+	FIELDTERMINATOR = ',',
+	ROWTERMINATOR = '\n',
+	TABLOCK
+);
 
+-- Bulk insert 102,000 records
+BULK INSERT ColumnStoreTable
+FROM 'D:\Projects\SQL-Projects\Notes\ColumnStoreTable2.csv'
+WITH (
+	FIRSTROW = 1,
+	FIELDTERMINATOR = ',',
+	ROWTERMINATOR = '\n',
+	TABLOCK
+);
+
+-- Inspect rowgroups and deltastore
+SELECT 
+	CONCAT(OBJECT_SCHEMA_NAME(cs.[object_id], DB_ID()), '.', OBJECT_NAME(cs.[object_id])) AS [table],
+	i.name AS [index],
+	cs.partition_number AS [partition],
+	cs.row_group_id AS [rowgroups],
+	cs.delta_store_hobt_id AS [delta rowgroups],
+	cs.state_desc AS [state],
+	cs.total_rows AS [total rows],
+	ISNULL(cs.deleted_rows, 0) AS [deleted rows],
+	RTRIM(CAST(ISNULL(cs.size_in_bytes, 0) AS Char)) + ' bytes' AS [size]
+FROM sys.dm_db_column_store_row_group_physical_stats cs
+INNER JOIN sys.indexes i ON i.object_id = cs.object_id AND i.index_id = cs.index_id
+ORDER BY cs.object_id, cs.index_id, cs.row_group_id
 
 
 
@@ -558,7 +640,6 @@ JOIN sys.dm_db_missing_index_group_stats migs ON migs.group_handle = mig.index_g
 JOIN sys.dm_db_missing_index_details mid ON mid.index_handle = mig.index_handle
 ORDER BY estimated_improvement DESC;
 GO
-
 
 
 
@@ -660,6 +741,9 @@ SELECT
 FROM sys.dm_db_index_physical_stats(DB_ID('AdventureWorks2025'), OBJECT_ID('Production.WorkOrderRouting'), NULL, NULL, 'LIMITED') ips
 ORDER BY ips.avg_fragmentation_in_percent DESC
 GO
+
+
+
 
 
 -- 5C: HEAP MAINTENANCE
