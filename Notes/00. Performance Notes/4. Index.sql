@@ -504,41 +504,40 @@ CREATE NONCLUSTERED INDEX Idx_Table_computedcolumn_nonprecise2 ON sc2.Table_comp
 -- 1. Columnstore indexes store data in a coumn-wise format (physically column-based, logically row-organized).
 --	+ Achieve compression up to 10x compared to uncompressed storage.
 --	+ Benefit from compressing column data rather than row data, enabling high compression rates.
---	+ 
-
--- 1. Columnstore index is a column-based data storage which physically store data in a column-wise format, and logically organized as a table with rows
---	+ Effectively compress data up to 10 times smaller compared to uncompress one
---	+ Benefit from compress column data instead of row data, achieving high compression rate
---	+ Can achieve up to 10 times the query performance, especially for quering large range of values
---	+ Significantly reduce data storage cost -> reduce I/O cost, but could intensively consume CPUs to decompress data when read
--- 2. The structure of a columnstore table
---	+ A table is sliced into multiple rowgroups
---	+ Each rowgroup contains a list of compressed column segments which each segement represents a column of the table
---	+ Each column segment is stored in a seperate LoB page as data page
---	+ The data page consists of 2 parts are Dictionary and Data Stream
--- 3. To reduce fragmentation, the columnstore index uses other clustured index called deltastore to temporarily identify deleted rows
---	+ If the number of deleted rows is large enough, Reorganize index to actual delete rows from compressed rows group, and completely remove deltastore, which increased index quality
--- 4. To improve compression and performance, the index uses delta rowgroup/deltastore
---	+ Delta rowgroup is a clustered B-tree index used to store data in a rowstore structure
---	+ Deltastore is a group of delta rowgroups
---	+ The deltastore helps to load small of data before compress (when the data reach at least 102,400 rows) and move it into the columnstore
---	+ Implement Rebuild/Reorganize to completely remove and move deltastore to columnstore
---	+ Its ideal to do bulk insert to minimize delta rowgroups (the best size is between 102,400 and 1,048,576)
--- 5. The columnstore is ideal for data warehousing, real-time analytics workloads, or any workload that insert large volumnes of data with minimal updates/deletes (like IoT) as:
---	+ Significantly reduce data storage cost
---	+ Reduce memory usage since a small of data is loaded
---	+ Best practice if query often select a few columns, and require scanning large range of values
--- 6. Choose the appropriate data compression method
---	+ Use columnstore compression for best query performance
---	+ Use archive compression for best data compression
--- 7. Don't use clustured columnstore index when
---	+ The table requires VARCHAR(MAX), NVARCHAR(MAX) or VARBINARY(MAX) data types.
---	+ The table has less than one million rows per partition.
---	+ More than 10% of the operations on the table are updates and deletes
--- 8. Columnstore performance
---	+ Column elimination occurs when a query target only some columns, the server will skip reading other columns
---	+ Rowstore elimination occurs when a query only focus on a specific range of values of a column which represent the nature order (like column "Order date") over time
---		++ To determine which rows to be eliminated, the index uses metadata consists of maximum and minimum value of each column segement, to identify the range value of that column
+--	+ Can deliver up to 10x query performance improvements, especially for large analytical scans.
+--	+ Reduce storage and I/O costs, though CPU usage may increase due to decompression during reads.
+-- 2. Structure of a columnstore table:
+--	+ Data is devided into rowgroups.
+--	+ Each rowgroup contains compressed column segments (one per column).
+--	+ Each column segment is stored in a seperate LOB page.
+--	+ Column segment pages consists of a Dictionary and a Data Stream.
+-- 3. Deleted rows are tracked in a delta store (rowstore B-tree).
+--	+ When enough rows are deleted, REORGANIZE removes them from compressed rowgroups and clear the delta store.
+--	+ This improves index quality and reduce fragmentation.
+-- 4. Delat rowgroups and deltastore:
+--	+ Delta rowgroup = clustered B-tree rowstore used for staging data before compression.
+--	+ Deltastore = collection of delta rowgroups.
+--	+ Small inserts go into the deltastore until they reach ~102,400 rows, then are compressed into columnstore.
+--	+ REBUILD/REORGANIZE moves deltastore rows into columnstore.
+--	+ Bulk inserts are ideal (optimal rowgroup size: 102,400 to 1,048,567 rows).
+-- 5. Ideal workloads for columnstore:
+--	+ Data warehousing, real-time analytics, IoT scenarios.
+--	+ Large volumes of inserts with minimal updates/deletes.
+--	+ Queries that scan large ranges but select only a few columns.
+-- 6. Compression options:
+--	+ COLUMNSTORE compression → best query performance.
+--	+ ARCHIVE compression → best storage savings.
+-- 7. Avoid clustered columnstore indexes when:
+--	+ Table contains VARCHAR(MAX), NVARCHAR(MAX), or VARBINARY(MAX).
+--	+ Table has fewer than 1 million rows per partition.
+--	+ More than ~10% of operations are updates/deletes.
+-- 8. Performance features:
+--	+ Column elimination: only the required columns are read during query execution.
+--	+ Rowgroup elimination: metadata (such as min/max values per segment) allows skipping irrelevant rowgroups, which cannot satisfy the query predicate.
+--	+ Recommendation: 
+--		+ Use appropriate range filters on columns with naturally increasing values (e.g., OrderDate) to improve rowgroup elimination efficiency.
+--		+ Insert data in roughly sorted order on these columns when possible.
+--		+ This improves segment metadata quality and increases rowgroup elimination efficiency.
 
 -- Define columnstore index
 CREATE TABLE ColumnStoreTable (
@@ -608,16 +607,18 @@ ORDER BY cs.object_id, cs.index_id, cs.row_group_id
 
 
 -- 5A: TUNE NONCLUSTERED INDEXES
--- 1.SQL Server provide missing index feature which give index suggestions.
--- 2. Index suggestions has some limitations: 
---	+ There are no tests or cost-benefit analysis againts suggestions.
---	+ The feature suggests only nonclustered disk-based rowstore indexes.
---	+ The suggestions do not specify an order for key columns.
--- 2. To view missing index suggestions, query the following DMV:
---	+ sys.dm_db_missing_index_group_stats: summary information, for example, the performance improvements gained from implementing the specific group of missing indexes.
---	+ sys.dm_db_missing_index_groups: information of groups of missing indexes.
---	+ sys.dm_db_missing_index_details: detailed information like table name, column names and column types to make up the missing index.
---	+ sys.dm_db_missing_index_columns: information about table columns that are missing an index.
+-- 1. SQL Server provides a "missing index" feature that suggest potential indexes.
+-- 2. Limitations of missing index suggestions:
+--	+ No cost-benefit analysis or testing is performed on suggestions.
+--	+ Only nonclustered, disk-based rowstore indexes are suggested.
+--	+ Suggested indexes do not specify column order for key columns.
+-- 3. To view missing index suggestions, query the following DMVs:
+--	+ sys.dm_db_missing_index_group_stats → summary info (e.g., estimated performance gain).
+--	+ sys.dm_db_missing_index_groups → groups of missing indexes.
+--	+ sys.dm_db_missing_index_details → details such as table name, column names, and types.
+--	+ sys.dm_db_missing_index_columns → columns missing indexes.
+
+-- Example: Generate CREATE INDEX statements for top 20 suggested indexes.
 SELECT 
 	TOP 20
 	CONVERT(varchar(30), GETDATE(), 126) AS runtime,
@@ -646,23 +647,23 @@ GO
 
 
 -- 5B: INDEX MAINTENANCE
--- 1. Index fragmentation (only occurs on rowstore index):
---	+ Exists when logical ordering within the index does not macth the physical ordering of index pages (means index data are not sequentially stored).
---	+ Increasing as many data modifications performed, especially non-sequential insertion on full page causes page splits.
---	+ As more page splits occurs, more pages and gaps on pages increased, cause the index to become scattered (fragmented)
---	+ For full/range index scans, additional I/O is required as more pages to read
--- 2. Page density
---	+ Define how much space allocated on a page
---	+ If page density is low, more pages are created to store the same amount of data
---	+ With low page density, there are more pages to read, therefore the cost of I/O is higher
--- 3. In columnstore index, fragmentation is defined as the ratio of deleted rows to total rows
--- 4. Implement Index Reorganize and Rebuild operation to reduce index fragmentation and increase page density.
---	+ Reorganize rowstore index is physically reorder the leaf-level pages, and compacts index page to the fill factor of the index
---	+ Reorganize columnstore index forces deltastore rows goups into larger compressed row groups which reduce the number of groups, this cost CPU resource to compress data
---	+ Rebuild an index will drop and re-create the whole index tree, which cost more resource compared to Reorganize
---	+ Rebuild rowstore index removes fragmentation in all levels of index, rebuild can be performed on a single index, some indexes or on all indexes at once
---	+ Rebuild a columnstore index removed fragmenatation, and moves any deltastore rows into columnstore
---	+ Rebuild index also update statistics to the current state
+-- 1. Index fragmentation (applies only to rowstore indexes):
+--	+ Occurs when logical ordering of index keys does not macth the physical ordering of index pages.
+--	+ Increases with frequent data modification, especially non-sequential inserts that cause page splits.
+--	+ Page splits create additional pages and gaps, leading to scattered (fragmented) data.
+--	+ For full/range scans, fragmentation increases I/O because more pages must be read.
+-- 2. Page density:
+--	+ Defines how much space is used on each page.
+--	+ Low page density means more pages are required to store the same amount of data.
+--	+ More pages increase I/O costs during scans.
+-- 3. Columnstore fragmentation:
+--	+ Defined as the ratio of deleted rows to total rows in compressed rowgroups.
+-- 4. Maintenance operations:
+--	+ REORGANIZE (rowstore): physically reorders leaf-level pages and compacts them to the index fill factor.
+--	+ REORGANIZE (columnstore): merges delta rowgroups into larger compressed compressed rowgroups, reducing fragmentation (cost CPUs for compressing operations).
+--	+ REBUILD (rowstore): drops and recreates the entire index tree, removing fragmentation at all levels. Can be applied to one or all indexes.
+--	+ REBUILD (columnstore): removes fragmentation and moves deltastore rows into compressed columnstore.
+--	+ REBUILD also updates index statistics.
 
 -- MEASURE ROWSTORE INDEX FRAGMENTATION AND PAGE DENSITY
 SELECT 
@@ -718,37 +719,57 @@ ORDER BY schema_name, object_name, index_name, partition_number, index_type
 GO
 ;
 
--- REORGANIZE AN INDEX (if fragmentation <= 60%)
+-- REORGANIZE AN INDEX (recommended if fragmentation <= 60%)
 ALTER INDEX AK_Employee_NationalIDNumber
 ON HumanResources.Employee
 REORGANIZE
 
--- REBUILD AN INDEX (if fragmentation > 60%)
+-- REBUILD AN INDEX (recommended if fragmentation > 60%)
 ALTER INDEX PK_WorkOrderRouting_WorkOrderID_ProductID_OperationSequence
 ON Production.WorkOrderRouting
 REBUILD
-
-SELECT 
-	DB_NAME(ips.database_id) AS [database name],
-	ISNULL(OBJECT_SCHEMA_NAME(ips.object_id, ips.database_id), '') + '.' + ISNULL(OBJECT_NAME(ips.object_id, ips.database_id), '') AS [table name],
-	ips.index_type_desc AS [index type],
-	ips.alloc_unit_type_desc AS [unit type],
-	ips.page_count AS [page count],
-	FORMAT(ips.avg_fragmentation_in_percent, '##0.###') + '%' AS [avg fragmentation percent],
-	ISNULL(ips.fragment_count, 0) AS [fragment count],
-	ISNULL(ips.avg_fragment_size_in_pages, 0) AS [avg fragment size],
-	FORMAT(ips.avg_page_space_used_in_percent, '##0.###') + '%'  AS [page density]
-FROM sys.dm_db_index_physical_stats(DB_ID('AdventureWorks2025'), OBJECT_ID('Production.WorkOrderRouting'), NULL, NULL, 'LIMITED') ips
-ORDER BY ips.avg_fragmentation_in_percent DESC
-GO
 
 
 
 
 
 -- 5C: HEAP MAINTENANCE
--- 1. Heap fragmentation
---	+ Increasing as many data modifications performed, especially update/delete operations could cause gaps on pages.
---	+ If the gap space is insufficient for new added data, it create index pointer to the new location of that data.
---	+ If a record is updated with larger size data that exceeds the allocated space, it also create a new index pointer.
---	+ Index pointer could reduce read performance since server has to traverse through pointer to get the real required data.
+-- 1. Heap fragmentation:
+--	+ Occurs when data modifications (UPDATE/DELETE/INSERT) create gaps in pages.
+--	+ If a page does not have enough free space for new or updated data, SQL Server moves the row to another page 
+--	  and leaves a forwarding pointer in the original location.
+--	+ Forwarding pointers reduce read performance because the engine must follow the pointer to locate the actual row.
+--	+ Updates that increase row size (e.g., changing a short string to a longer one) often cause forwarding pointers.
+-- 2. Maintenance considerations:
+--	+ Heaps do not have a logical order, so fragmentation is mainly about forwarding pointers and page density.
+--	+ REBUILDING a heap removes forwarding pointers by recreating the table.
+--	+ REORGANIZE on a heap compacts pages and removes forwarding pointers without fully rebuilding.
+
+-- Create a heap (no clustered index)
+DROP TABLE IF EXISTS HeapExample;
+CREATE TABLE HeapExample (
+	id INT IDENTITY(1,1),
+	data Varchar(8000) NULL
+);
+
+-- Insert row
+INSERT INTO HeapExample (data)
+VALUES (REPLICATE('A', 1000)),
+       (REPLICATE('B', 1000)),
+       (REPLICATE('C', 1000));
+
+-- Update with larger values (cause forwarding pointers if page space is insufficient)
+UPDATE HeapExample
+SET Data = REPLICATE('Z', 7000)
+WHERE ID = 1;
+
+-- Check heap fragmentation (forwarding pointers)
+SELECT 
+	OBJECT_NAME(object_id) AS table_name,
+	index_type_desc,
+	avg_fragmentation_in_percent,
+	forwarded_record_count
+FROM sys.dm_db_index_physical_stats(DB_ID(), OBJECT_ID('HeapExample'), NULL, NULL, 'DETAILED');
+
+-- REBUILD HEAP
+ALTER TABLE HeapExample REBUILD;
