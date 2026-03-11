@@ -27,78 +27,113 @@
 --	+ The search condition could be a pattern to search or path to traverse in the graph
 --	+ The pattern goes from one node to another via an edge, in the direction of the arrow provided
 
--- Create graph objects
-CREATE TABLE Person
-(
-	ID Int PRIMARY KEY,
-	Name Varchar(100),
-	Age Int
+-- CREATE DATABASE
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE NAME = 'graphdemo')
+	CREATE DATABASE GraphDemo;
+GO
+
+USE GraphDemo;
+GO
+
+-- CREATE NODE TABLES
+CREATE TABLE Person (
+	ID Integer PRIMARY KEY,
+	name Varchar(100)
 ) AS NODE;
-CREATE TABLE friend
-(
-	StartDate Date
-) AS EDGE;
 
--- Insert into node table
-INSERT INTO dbo.Person VALUES (1, 'Alice', 20);
-INSERT INTO dbo.Person VALUES (2, 'John', 21);
-INSERT INTO dbo.Person VALUES (3, 'Jacob', 22);
+CREATE TABLE Restaurant (
+	ID Integer NOT NULL,
+	name Varchar(100),
+	city Varchar(100)
+) AS NODE;
 
--- Insert into edge table
-INSERT INTO dbo.friend VALUES (
-	(SELECT $node_id FROM dbo.Person WHERE name = 'Alice'),
-	(SELECT $node_id FROM dbo.Person WHERE name = 'John'),
-	'2026/03/09'
-);
-INSERT INTO dbo.friend VALUES (
-	(SELECT $node_id FROM dbo.Person WHERE name = 'Alice'),
-	(SELECT $node_id FROM dbo.Person WHERE name = 'Jacob'),
-	'2026/03/10'
-);
-INSERT INTO dbo.friend VALUES (
-	(SELECT $node_id FROM dbo.Person WHERE name = 'John'),
-	(SELECT $node_id FROM dbo.Person WHERE name = 'Jacob'),
-	'2026/03/10'
-);
+CREATE TABLE City (
+	ID Integer PRIMARY KEY,
+	name Varchar(100),
+	stateName Varchar(100)
+) AS NODE;
 
--- QUERY LANGUAGE EXTENSIONS
--- Find friends of John
-SELECT
-	Person2.Name,
-	friend.StartDate
-FROM Person AS Person1, friend, Person AS Person2
-WHERE MATCH(Person1-(friend)->Person2) AND Person1.Name = 'John'
-UNION ALL
-SELECT
-	Person2.Name,
-	friend.StartDate
-FROM Person AS Person1, friend, Person AS Person2
-WHERE MATCH(Person1<-(friend)-Person2) AND Person1.Name = 'John';
+-- CREATE EDGE TABLES
+CREATE TABLE likes (rating Integer) AS EDGE;
+CREATE TABLE friendOf AS EDGE;
+CREATE TABLE livesIn AS EDGE;
+CREATE TABLE locatedIn AS EDGE;
 
--- Find friends of John's friends
-SELECT
-	Person2.name AS [friend],
-	Person3.name AS [friend of friend]
-FROM Person Person1, friend, Person Person2, friend friend2, Person Person3
-WHERE MATCH(Person1-(friend)->Person2-(friend2)->Person3) AND Person1.name = 'John' AND Person3.name <> 'John'
+-- INSERT DATA INTO NODE TABLES
+INSERT INTO Person (ID, name)
+VALUES (1, 'John'), (2, 'Mary'), (3, 'Alice'), (4, 'Jacob'), (5, 'Julie');
+
+INSERT INTO Restaurant (ID, name, city)
+VALUES (1, 'Taco Dell', 'Bellevue'), (2, 'Ginger and spice', 'Seattle'), (3, 'Noodle Land', 'Redmond');
+
+INSERT INTO City (ID, name, stateName)
+VALUES (1, 'Bellevue', 'WA'), (2, 'Seattle', 'WA'), (3, 'Redmond', 'WA')
+
+-- INSERT INTO EDGE TABLES
+INSERT INTO likes
+VALUES ((SELECT $node_id FROM Person WHERE ID = 1), (SELECT $node_id FROM Restaurant WHERE ID = 1), 9),
+	((SELECT $node_id FROM Person WHERE ID = 2), (SELECT $node_id FROM Restaurant WHERE ID = 2), 9),
+	((SELECT $node_id FROM Person WHERE ID = 3), (SELECT $node_id FROM Restaurant WHERE ID = 3), 9),
+	((SELECT $node_id FROM Person WHERE ID = 4), (SELECT $node_id FROM Restaurant WHERE ID = 3), 9),
+    ((SELECT $node_id FROM Person WHERE ID = 5), (SELECT $node_id FROM Restaurant WHERE ID = 3), 9);
+
+INSERT INTO livesIn
+VALUES ((SELECT $node_id FROM Person WHERE ID = 1), (SELECT $node_id FROM City WHERE ID = 1)),
+	((SELECT $node_id FROM Person WHERE ID = 2), (SELECT $node_id FROM City WHERE ID = 2)),
+	((SELECT $node_id FROM Person WHERE ID = 3), (SELECT $node_id FROM City WHERE ID = 3)),
+	((SELECT $node_id FROM Person WHERE ID = 4), (SELECT $node_id FROM City WHERE ID = 3)),
+	((SELECT $node_id FROM Person WHERE ID = 5), (SELECT $node_id FROM City WHERE ID = 1));
+
+INSERT INTO locatedIn
+VALUES ((SELECT $node_id FROM Restaurant WHERE ID = 1), (SELECT $node_id FROM City WHERE ID = 1)),
+	((SELECT $node_id FROM Restaurant WHERE ID = 2), (SELECT $node_id FROM City WHERE ID = 2)),
+	((SELECT $node_id FROM Restaurant WHERE ID = 3), (SELECT $node_id FROM City WHERE ID = 3));
+
+INSERT INTO friendOf
+VALUES ((SELECT $node_id FROM Person WHERE ID = 1), (SELECT $node_id FROM Person WHERE ID = 2)),
+	((SELECT $NODE_ID FROM Person WHERE ID = 2), (SELECT $NODE_ID FROM Person WHERE ID = 3)),
+	((SELECT $NODE_ID FROM Person WHERE ID = 3), (SELECT $NODE_ID FROM Person WHERE ID = 1)),
+	((SELECT $NODE_ID FROM Person WHERE ID = 4), (SELECT $NODE_ID FROM Person WHERE ID = 2)),
+	((SELECT $NODE_ID FROM Person WHERE ID = 5), (SELECT $NODE_ID FROM Person WHERE ID = 4));
+
+
+
+-- Find which restaurant that John likes
+SELECT Restaurant.name
+FROM Person, likes, Restaurant
+WHERE MATCH(Person-(likes)->Restaurant)
+	AND Person.name = 'John'
+
+-- Find the restaurants that John's friends like
+SELECT Restaurant.name
+FROM Person Person1, friendOf fo, Person Person2, likes, Restaurant
+WHERE MATCH(Person1-(fo)->Person2-(likes)->Restaurant)
+	AND Person1.name = 'John'
+
+-- Find people who like a restaurant in the same city they live in
+SELECT Person.name, City.name, Restaurant.name
+FROM Person, livesIn, City, locatedIn, Restaurant, likes
+WHERE MATCH(Person-(livesIn)->City<-(locatedIn)-Restaurant<-(likes)-Person)
+
+-- Find friends of friends of friends
+SELECT CONCAT(Person.name, '->', Person2.name, '->', Person3.name, '->', Person4.name)
+FROM Person, friendOf, Person AS Person2, friendOf AS friendOffriend, Person AS Person3, friendOf AS friendOffriendOffriend, Person AS Person4
+WHERE MATCH(Person-(friendOf)->Person2-(friendOffriend)->Person3-(friendOffriendOffriend)->Person4)
+	AND Person.name != Person2.name
+	AND Person2.name != Person3.name
+	AND Person3.name != Person4.name
+	AND Person4.name != Person.name
+
+-- Find all friends of John
+SELECT Person2.name
+FROM Person, friendOf, Person AS Person2
+WHERE MATCH(Person-(friendOf)->Person2)
+	AND Person.name = 'John'
 UNION ALL
-SELECT
-	Person2.name AS [friend],
-	Person3.name AS [friend of friend]
-FROM Person Person1, friend, Person Person2, friend friend2, Person Person3
-WHERE MATCH(Person1-(friend)->Person2<-(friend2)-Person3) AND Person1.name = 'John' AND Person3.name <> 'John'
-UNION ALL
-SELECT
-	Person2.name AS [friend],
-	Person3.name AS [friend of friend]
-FROM Person Person1, friend, Person Person2, friend friend2, Person Person3
-WHERE MATCH(Person1<-(friend)-Person2-(friend2)->Person3) AND Person1.name = 'John' AND Person3.name <> 'John'
-UNION ALL
-SELECT
-	Person2.name AS [friend],
-	Person3.name AS [friend of friend]
-FROM Person Person1, friend, Person Person2, friend friend2, Person Person3
-WHERE MATCH(Person1<-(friend)-Person2<-(friend2)-Person3) AND Person1.name = 'John' AND Person3.name <> 'John'
+SELECT Person2.name
+FROM Person, friendOf, Person Person2
+WHERE MATCH(Person<-(friendOf)-Person2)
+	AND Person.name = 'John'
 
 -- Find people 1-3 hops away from a given person
 SELECT 
@@ -106,7 +141,7 @@ SELECT
 	STRING_AGG(Person2.name, '->') WITHIN GROUP (GRAPH PATH) AS friends
 FROM
 	Person AS Person1,
-	friend FOR PATH AS fo,
+	friendOf FOR PATH AS fo,
 	Person FOR PATH AS Person2
 WHERE MATCH(SHORTEST_PATH(Person1(-(fo)->Person2){1,3}))
 AND Person1.name = 'Jacob'
