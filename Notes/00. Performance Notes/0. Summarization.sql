@@ -15,6 +15,10 @@
 --	+ New data is queried all the time -> focus on improving query on new data
 
 
+-- Recompiled stored procedures if the database undergoes significant changes to its data or structure
+-- 1. This updates and optimized the procedure's query plan for those changes
+
+
 -- Insert many values to a table
 -- 1. Implement Bulk insert or use table-valued parameters on a procedure
 --	+ Reduce roud trips to the server
