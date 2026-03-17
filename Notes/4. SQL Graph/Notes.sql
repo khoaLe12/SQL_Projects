@@ -1,31 +1,49 @@
-
+﻿
 
 -- GRAPH DATABASE
--- 1. Offering capabilities to model complicated many-to-many relationships
--- 2. Consists of nodes and edges, node represent an entity and edge as relationship
--- 3. Provide some unique features:
---	+ Edges/relationships can have attributes or properties associated with them
---	+ A single edge can connect multiple nodes
---	+ Enable queries with pattern macthing and multi-hop navigation
---	+ Easily express transitive closure and polymorphic queries
--- 4. Each node table has an implicit column/pseudo-column called $node_id
---	+ The $node_id column is automatically generated with the combination of obejct ID for the graph table and internally generated bigint value.
---	+ By default, SQL Server create a unique, nonclustered index for $node_id
---	+ Inserting or updating on $node_id is not allowed which cause error
---	+ Select $node_id will return JSON representation of the value, and column name is displayed as the format [$node_id_<unique suffix>]
--- 5. Edge table includes 3 pseudo-columns are $edge_id, $from_id, $to_id
---	+ The $edge_id is a unique identifier for a given edge, it is the combination of object ID of the edge table and interanlly generated bigint value
---	+ The $from_id is the $node_id of the node, from where the edge originates.
---	+ The $to_id is the $node_id of the node, at which the edge terminates.
---	+ By default, SQL Server create unqiue, nonclustered idnexes for these columns
---	+ Inserting or updating on $edge_id is not allowed which cause error
--- 6. Use metadata views to see attributes of a node or edge table
---	+ The columns is_node, is_edge of sys.tables identify the graph tables 
---	+ Columns graph_type, graph_type_desc of sys.columns to list the types of columns used in graph tables
--- 7. SQL Server provide built-in MATCH function for pattern macthing and traversal through the graph
---	+ Used to specify a search condition for a graph, as part of WHERE clause.
---	+ The search condition could be a pattern to search or path to traverse in the graph
---	+ The pattern goes from one node to another via an edge, in the direction of the arrow provided
+-- 1. Purpose:
+--	+ Designed to model complex many-to-many relationships more naturally than traditional relational tables.
+-- 2. Core concepts:
+--	+ Nodes represent entities (e.g., Person, Product).
+--	+ Edges represent relationships between nodes (e.g., FriendOf, Purchased).
+-- 3. Unique features:
+--	+ Edges can have attributes/properties (e.g., relationship strength, date).
+--	+ A single edge can connect multiple nodes.
+--	+ Supports pattern matching and multi-hop navigation.
+--	+ Enables transitive closure and polymorphic queries.
+-- 4. Node tables:
+--	+ Each node table has an implicit pseudo-column: $node_id.
+--	+ $node_id is automatically generated (combination of object ID + bigint).
+--	+ SQL Server creates a unique nonclustered index on $node_id.
+--	+ $node_id cannot be inserted or updated manually.
+--	+ Selecting $node_id returns a JSON-like representation, with column name formatted as [$node_id_<unqiue suffix>].
+-- 5. Edge tables:
+--	+ Include three pseudo-columns: $edge_id, $from_id, $to_id.
+--	+ $edge_id uniquely identifies an edge (object ID + bigint).
+--	+ $from_id = $node_id of the source node.
+--	+ $to_id = $node_id of the target node.
+--	+ SQL Server creates unique nonclustered indexes in these columns.
+--	+ $edge_id cannot be inserted or updated manually.
+-- 6. Metadata views:
+--	+ sys.tables → column is_node, is_edge identify graph tables.
+--	+ sys.columns → columns graph_type, graph_type_desc list graph column types.
+-- 7. MATCH function:
+--	+ Used in WHERE clauses for pattern matching and traversal.
+--	+ Defines paths from one node to another via edges, following arrow direction.
+-- 8. SHORTEST_PATH function:
+--	+ Recursively searches a graph until a condition is satisfied.
+--	+ Path definition includes source node, edges, and nodes (FOR PATH keyword).
+--	+ Arbitrary length patterns:
+--		+ '+' → traverse until shortest path found.
+--		+ '{1,n}' → repeat 1 to n times, stop at shortest path.
+--	+ Useful path functions:
+--		+ LAST_NODE → merge paths ending at the same node.
+--		+ STRING_AGG → concatenate node values with a separator.
+--		+ LAST_VALUE → return last node value in path.
+--		+ SUM → sum attributes along path.
+--		+ COUNT → count non-null attributes along path.
+--		+ MIN → minimum attribute value along path.
+--		+ MAX → maximum attribute value along path.
 
 -- CREATE DATABASE
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE NAME = 'graphdemo')
@@ -135,6 +153,42 @@ FROM Person, friendOf, Person Person2
 WHERE MATCH(Person<-(friendOf)-Person2)
 	AND Person.name = 'John'
 
+-- Find shortest path between two people
+SELECT PersonName, Friends
+FROM (
+	SELECT
+		Person1.name AS PersonName,
+		STRING_AGG(Person2.name, '->') WITHIN GROUP (GRAPH PATH) AS Friends,
+		LAST_VALUE(Person2.name) WITHIN GROUP (GRAPH PATH) AS LastNode
+	FROM 
+		Person AS Person1,
+		friendOf FOR PATH AS fo,
+		Person FOR PATH AS Person2
+	WHERE MATCH(SHORTEST_PATH(Person1(-(fo)->Person2)+))
+	AND Person1.name = 'Jacob'
+) AS Q
+WHERE Q.LastNode = 'Alice'
+
+-- Count the number of hops/levels traversed to go from one person to another in the graph
+SELECT 
+	PersonName,
+	Friends,
+	levels
+FROM (
+	SELECT 
+		Person1.name AS PersonName,
+		STRING_AGG(Person2.name, '->') WITHIN GROUP (GRAPH PATH) AS Friends,
+		LAST_VALUE(Person2.name) WITHIN GROUP (GRAPH PATH) AS LastNode,
+		COUNT(Person2.name) WITHIN GROUP (GRAPH PATH) AS levels
+	FROM 
+		Person AS Person1,
+		friendOf FOR PATH AS fo, 
+		Person FOR PATH AS Person2
+	WHERE MATCH(SHORTEST_PATH(Person1(-(fo)->Person2)+))
+	AND Person1.name = 'Jacob'
+) AS Q
+WHERE Q.LastNode = 'Alice'
+
 -- Find people 1-3 hops away from a given person
 SELECT 
 	Person1.name AS PersonName,
@@ -145,3 +199,19 @@ FROM
 	Person FOR PATH AS Person2
 WHERE MATCH(SHORTEST_PATH(Person1(-(fo)->Person2){1,3}))
 AND Person1.name = 'Jacob'
+
+
+-- Find people 1-3 hops away from a given person, who also like a specific restaurant
+SELECT 
+	Person.name AS PersonName,
+	STRING_AGG(Person2.name, '->') WITHIN GROUP(GRAPH PATH) AS Friends,
+	Restaurant.name
+FROM 
+	Person AS Person, 
+	friendOf FOR PATH AS fo, 
+	Person FOR PATH AS Person2, 
+	likes AS likes, 
+	Restaurant AS Restaurant
+WHERE MATCH(SHORTEST_PATH(Person(-(fo)->Person2){1,3}) AND LAST_NODE(Person2)-(likes)->Restaurant)
+	AND Person.name = 'Jacob'
+	AND Restaurant.name = 'Ginger and Spice'

@@ -93,8 +93,72 @@ GO
 
 
 
+-- View the definition of a stored procedure
+EXEC sp_helptext N'AdventureWorks2025.dbo.uspLogError'
+;
+SELECT OBJECT_DEFINITION(OBJECT_ID(N'AdventureWorks2025.dbo.uspLogError'))
+;
+SELECT [definition]
+FROM sys.sql_modules
+WHERE object_id = OBJECT_ID(N'dbo.uspLogError');
+
+
+
+
+
+
+-- View the dependencies of a stored procedure
+-- Display the objects that depend on a procedure
+SELECT referencing_schema_name, referencing_entity_name, referencing_id, referencing_class_desc, is_caller_dependent
+FROM sys.dm_sql_referencing_entities('dbo.uspGetBillOfMaterials', 'OBJECT')
+GO
+-- Display the objects a procedure depends on
+SELECT referenced_schema_name, referenced_entity_name,  
+referenced_minor_name,referenced_minor_id, referenced_class_desc,  
+is_caller_dependent, is_ambiguous  
+FROM sys.dm_sql_referenced_entities ('Purchasing.uspVendorAllInfo', 'OBJECT');  
+GO
+-- Using sys.sql_expression_dependencies
+SELECT
+	OBJECT_SCHEMA_NAME(referencing_id) AS referencing_schema_name,
+	OBJECT_NAME(referencing_id) AS referencing_entity_name,
+	o.type_desc AS referencing_description,
+	COALESCE(COL_NAME(referencing_id, referencing_minor_id), '(n/a)') AS referenced_column_name,
+	is_caller_dependent AS sed
+FROM sys.sql_expression_dependencies AS sed
+INNER JOIN sys.objects AS o ON sed.referencing_id = o.object_id
+WHERE referenced_id = OBJECT_ID('Purchasing.uspVendorAllInfo')
+;
+SELECT OBJECT_NAME(referencing_id) AS referencing_entity_name,   
+    o.type_desc AS referencing_description,
+    COALESCE(COL_NAME(referencing_id, referencing_minor_id), '(n/a)') AS referencing_minor_id,   
+    referencing_class_desc, referenced_class_desc,  
+    referenced_server_name, referenced_database_name, referenced_schema_name,  
+    referenced_entity_name,   
+    COALESCE(COL_NAME(referenced_id, referenced_minor_id), '(n/a)') AS referenced_column_name,  
+    is_caller_dependent, is_ambiguous  
+FROM sys.sql_expression_dependencies AS sed  
+INNER JOIN sys.objects AS o ON sed.referencing_id = o.object_id  
+WHERE referencing_id = OBJECT_ID(N'Purchasing.uspVendorAllInfo'); 
+
+
+
+
+
+
+
+-- View table definition
+EXEC sp_help 'Production.Product';
+
+
+
+
 
 -- CONTENT
 -- A request is also called a batch and may contain one ore more queries.
 -- A session may have multiple requests active at the same time.
 -- Each query in the request may start multiple threads (tasks), if a parallel execution plan is used.
+
+
+
+
