@@ -1,0 +1,39 @@
+
+
+-- CHANGE DATA CAPTURE
+-- 1. It is a built-in feature to track data changes made by DML operation.
+-- 2. The progress run asynchronously as background job by SQL Server Agent that reads transaction log to capture changes.
+-- 3. Provides a more effective and comprehensive solution compared to alternative manually implemented solutions.
+--	+ Reduce development time
+--	+ Improve performance of DML operation (since no additional actions are performed, like triggers, additional table insertion, ...)
+-- 4. Offer many useful features:
+--	+ Built-in cleanup mechanism with retention-based cleanup policy that is performed automatically in the background
+--	+ The timeline of changes is based transaction commit time, ensure the reliable of changes order
+--	+ Provide 2 query functions to obtain change information from historical view of changes, or metadata from change data capture metedata tables.
+-- 5. To enable/disable the Change Data Capture feature:
+--	+ Firstly, enable the feature for a database using function sys.sp_cdc_enable_db.
+--	+ Secondly, enable the fearure at the table level using sys.sp_cdc_enable_table.
+--	+ Using functions sys.sp_cdc_disable_db and sys.sp_cdc_disable_table to disable the feature.
+-- 6. Each source table that is enabled with change data capture is constructed that.
+--	+ Each table can have maximum of 2 associated capture instances, which named by format <schema name_table name> of the tracked table.
+--	+ The capture instance consists of a change table, metadata tables and up to 2 query functions which are created in the cdc schema.
+-- 7. Metadata describes configurations of the instance 
+--	+ Defined in tables cdc.change_tables, cdc.index_columns, and cdc.captured_columns.
+--	+ Metadata can be retrieved using the stored procedure sys.sp_cdc_help_change_data_capture.
+-- 8. Change table contains change information
+--	+ The table is named by appending _CT to the instance name know as <instance name_CT>.
+--	+ A change table contains first 5 metadata columns, and identified captured columns from the source table.
+--	+ The metadata columns identify and interpret the change activity
+--		+ Column __$start_lsn stores the commit log sequence number (LSN) of the change.
+--		+ Column __$seqval used to order the changes in the same transaction.
+--		+ Column __$operation determine the operation performed (1=delete, 2=insert, 3=before update, 4=after update)
+--		+ Column __$update_mask works as bit mask to identify which columns has changed in the operation (1=value is changed, 0=no change)
+--	+ Each insert/delete operation corresponding to a single row within the change table, captured the data after insertion and data before deletion.
+--	+ Each update operation populates 2 rows, one for original data and the other for updated data
+--	+ To query changes from change table, use the built-in function name <fn_cdc_get_all_changes_instance name>.
+--	+ To query net changes of instance (if supported), use the function <fn_cdc_get_net_changes_instance name>.
+-- 9. The change data capture cleanup process periodically removes expired data (data that out of validity interval, by the default the last 3 days)
+--	+ The log sequence number (LSN) and transaction commit time identify the validity of a data, the value is stored at cdc.lsn_time_mapping (columns start_lsn and tran_end_time)
+--	+ The cleanup process use high water mark of commit time to computes a new low water mark constructs the validity interval (time between high and low water mark) for cleanup process
+--	+ To retrieve high and low water mark of an instance, use functions sys.fn_cdc_get_max_lsn and sys.fn_cdc_get_min_lsn respecively
+-- 10. 
