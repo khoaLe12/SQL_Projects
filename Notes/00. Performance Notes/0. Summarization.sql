@@ -13,3 +13,7 @@
 -- 1. To seperate old data and new data
 --	+ Old data is rarely queried/modified
 --	+ New data is queried all the time -> focus on improving query on new data
+
+
+-- Recompiled stored procedures if the database undergoes significant changes to its data or structure
+-- 1. This updates and optimized the procedure's query plan for those changes
