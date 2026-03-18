@@ -5,7 +5,7 @@
 -- 2. The progress run asynchronously as background job by SQL Server Agent that reads transaction log to capture changes.
 -- 3. Provides a more effective and comprehensive solution compared to alternative manually implemented solutions.
 --	+ Reduce development time
---	+ Improve performance of DML operation (since no additional actions are performed, like triggers, additional table insertion, ...)
+--	+ Improve performance of DML operation (since no additional actions are performed, like triggers, additional table insertion, additional query to get original data ...)
 -- 4. Offer many useful features:
 --	+ Built-in cleanup mechanism with retention-based cleanup policy that is performed automatically in the background
 --	+ The timeline of changes is based transaction commit time, ensure the reliable of changes order
@@ -36,4 +36,30 @@
 --	+ The log sequence number (LSN) and transaction commit time identify the validity of a data, the value is stored at cdc.lsn_time_mapping (columns start_lsn and tran_end_time)
 --	+ The cleanup process use high water mark of commit time to computes a new low water mark constructs the validity interval (time between high and low water mark) for cleanup process
 --	+ To retrieve high and low water mark of an instance, use functions sys.fn_cdc_get_max_lsn and sys.fn_cdc_get_min_lsn respecively
--- 10. 
+-- 10. There are two agent jobs for the feature are capture jobs and cleanup job
+--	+ The capture jobs runs continously, processing a maximum of 1000 transacrions per scan cycle with a wait of 5 seconds between cycles.
+--	+ The cleanup job runs daily at 2 A.M. It retains log entries for 3 days
+--	+ To create or drop change data capture agent, use the procedure sys.sp_cdc_add_job and sys.sp_cdc_drop_job
+--	+ To modify the default configuration of agents, use sys.sp_cdc_change_job; To view use sys.sp_cdc_help_jobs
+--	+ To start or stop the capture job, use sys.sp_cdc_start_job and sys.sp_cdc_stop_job.
+--	+ It is best practice to stop the job during the periods of peak demand
+
+
+
+USE AdventureWorks2025
+GO
+
+
+-- ENABLE/DISABLE DATABASE FOR CDC
+EXEC sys.sp_cdc_enable_db;
+EXEC sys.sp_cdc_disable_db;
+
+
+-- CHECK CDC STATUS
+SELECT 
+	CASE is_cdc_enabled 
+		WHEN 1 THEN N'True'
+		ELSE 'False'
+	END AS [CDC Enabled]
+FROM sys.databases 
+WHERE database_id = DB_ID()
