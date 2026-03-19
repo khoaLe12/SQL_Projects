@@ -163,4 +163,55 @@ select
 	SalesOrderID,
 	OrderDate,
 	OrderDate AT TIME ZONE 'Alaskan Standard Time' AT TIME ZONE 'Mountain Standard Time (Mexico)' AS [Alaskan time -> Mountain (Mexico)]
-from Sales.SalesOrderHeader
+from Sales.SalesOrderHeader;
+
+
+
+-- 12: pivot multiple columns -> implement query string for dynamic pivot
+WITH CTE_PREP AS (
+	SELECT 
+		e.BusinessEntityID, 
+		e.NationalIDNumber, 
+		e.LoginID, 
+		e.JobTitle, 
+		e.HireDate, 
+		edh.StartDate, 
+		d.[Name] AS depName, 
+		s.Name AS shiftName, 
+		s.StartTime,
+		s.EndTime,
+		CAST(DENSE_RANK() OVER (PARTITION BY e.BusinessEntityID ORDER BY edh.StartDate) AS VARCHAR) AS str_rnDept,
+		CAST(DENSE_RANK() OVER (PARTITION BY e.BusinessEntityID, d.Name ORDER BY s.StartTime) AS VARCHAR) AS str_rnShift,
+		DENSE_RANK() OVER (PARTITION BY e.BusinessEntityID ORDER BY edh.StartDate) AS rnDept, 
+		DENSE_RANK() OVER (PARTITION BY e.BusinessEntityID, d.Name ORDER BY s.StartTime) AS rnShift 
+	FROM HumanResources.Employee e 
+	LEFT JOIN HumanResources.EmployeeDepartmentHistory edh ON edh.BusinessEntityID = e.BusinessEntityID 
+	LEFT JOIN HumanResources.Department d ON d.DepartmentID = edh.DepartmentID 
+	LEFT JOIN HumanResources.Shift s ON s.ShiftID = edh.ShiftID
+), 
+CTE_PREP2 AS (
+	SELECT 
+		cte.BusinessEntityID, 
+		cte.NationalIDNumber, 
+		cte.LoginID, 
+		cte.JobTitle, 
+		cte.HireDate,
+		temp.col,
+		temp.val
+	FROM CTE_PREP cte
+	CROSS APPLY (
+		VALUES('Department' + cte.str_rnDept, cte.depName),
+			  ('StartDate' + cte.str_rnDept, CAST(cte.StartDate AS VARCHAR)),
+			  ('ShiftName' + cte.str_rnDept + cte.str_rnShift, cte.shiftName),
+			  ('ShiftStart' + cte.str_rnDept + cte.str_rnShift, CAST(cte.StartTime AS VARCHAR)),
+			  ('ShiftEnd' + cte.str_rnDept + cte.str_rnShift, CAST(cte.EndTime AS VARCHAR))
+	) temp (col, val)
+)
+SELECT 
+	*
+FROM CTE_PREP2 AS src
+PIVOT (
+	MAX(val) 
+	FOR col IN ([Department1] , [StartDate1], [ShiftName11], [ShiftStart11], [ShiftEnd11], [ShiftName12], [ShiftStart12], [ShiftEnd12],
+		[Department2] , [StartDate2], [ShiftName21], [ShiftStart21], [ShiftEnd21], [ShiftName22], [ShiftStart22], [ShiftEnd22])
+) AS piv

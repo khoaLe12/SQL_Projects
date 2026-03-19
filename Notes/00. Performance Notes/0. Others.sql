@@ -147,8 +147,9 @@ WHERE referencing_id = OBJECT_ID(N'Purchasing.uspVendorAllInfo');
 
 
 
--- View table definition
+-- View table/index definition
 EXEC sp_help 'Production.Product';
+EXEC sp_helpindex 'Production.Product';
 
 
 
@@ -158,7 +159,40 @@ EXEC sp_help 'Production.Product';
 -- A request is also called a batch and may contain one ore more queries.
 -- A session may have multiple requests active at the same time.
 -- Each query in the request may start multiple threads (tasks), if a parallel execution plan is used.
+if object_id('tempdb..#temp') is not null
+	drop table #temp
+select * INTO #temp from dbo.ArCdKh 
+GO
 
+SELECT
+	p.spid,
+	p.dbid,
+	p.hostname,
+	p.status AS [process status],
+	s.status AS [session status],
+	r.status AS [request status],
+	(
+		SELECT SUBSTRING(
+			dest.text,
+			(r.statement_start_offset / 2) + 1,
+			((CASE r.statement_end_offset
+				WHEN -1 THEN DATALENGTH(dest.text)
+				ELSE r.statement_end_offset
+			END - r.statement_start_offset) / 2) + 1
+		)
+		FOR XML PATH (''), TYPE
+	) AS [request sql text],
+	(SELECT destp.text FOR XML PATH (''), TYPE) AS [process sql text]
+FROM sys.sysprocesses p
+LEFT JOIN sys.dm_exec_sessions s ON s.host_process_id = p.hostprocess
+LEFT JOIN sys.dm_exec_requests r ON r.session_id = s.session_id
+OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) AS dest
+OUTER APPLY sys.dm_exec_sql_text(p.sql_handle) AS destp
+WHERE p.spid = @@SPID
+GO
 
-
-
+if object_id('tempdb..#temp') is not null
+	drop table #temp
+GO
+select * INTO #temp from dbo.ArCdKh 
+GO
