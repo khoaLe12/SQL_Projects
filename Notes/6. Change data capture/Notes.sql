@@ -114,20 +114,26 @@ SELECT * FROM sys.dm_cdc_log_scan_sessions
 SELECT latency, ISNULL(command_count/NULLIF(duration, 0), 0) AS [throughput] FROM sys.dm_cdc_log_scan_sessions WHERE session_id = 0
 
 
+-- ============================================================================================================================================================================
 -- QUERY CHANGE DATA
--- Create LSN-based range to be searched: interval1 (@min_lsn, @max_lsn), interval2 (@increment_lsn, @decrement_lsn), interval3 (@begin_lsn, @end_lsn), interval4 (@previousdate, @currentdate)
-DECLARE @min_lsn Binary(10) = sys.fn_cdc_get_min_lsn('Person_BusinessEntity');
-DECLARE @max_lsn Binary(10) = sys.fn_cdc_get_max_lsn();
-DECLARE @increment_lsn Binary(10) = sys.fn_cdc_increment_lsn(@min_lsn);
-DECLARE @decrement_lsn Binary(10) = sys.fn_cdc_decrement_lsn(@max_lsn);
-DECLARE @begin_lsn Binary(10) = sys.fn_cdc_map_time_to_lsn(N'smallest greater than or equal', DATEADD(MINUTE, 30, sys.fn_cdc_map_lsn_to_time(@min_lsn)));
-DECLARE @end_lsn Binary(10) = sys.fn_cdc_map_time_to_lsn(N'largest less than or equal', DATEADD(MINUTE, -30, sys.fn_cdc_map_lsn_to_time(@max_lsn)));
-DECLARE @previousdate Binary(10) = sys.fn_cdc_map_time_to_lsn(N'smallest greater than or equal', DATEADD(DAY, -1, GETDATE()));
-DECLARE @currentdate Binary(10) = sys.fn_cdc_map_time_to_lsn(N'largest less than or equal', GETDATE());
-
-
--- QUERY CHANGE DATA IN A RANGE USING TVFs
+-- 1. Create LSN-based range to be searched: interval1 (@min_lsn, @max_lsn), interval2 (@increment_lsn, @decrement_lsn), interval3 (@begin_lsn, @end_lsn), interval4 (@previousdate, @currentdate)
+-- 2. Query change data in a range using TVFs
+-- 3. Identify changed column on update operation
 BEGIN TRY
+	DECLARE @min_lsn Binary(10) = sys.fn_cdc_get_min_lsn('Person_BusinessEntity');
+	DECLARE @max_lsn Binary(10) = sys.fn_cdc_get_max_lsn();
+	DECLARE @increment_lsn Binary(10) = sys.fn_cdc_increment_lsn(@min_lsn);
+	DECLARE @decrement_lsn Binary(10) = sys.fn_cdc_decrement_lsn(@max_lsn);
+	DECLARE @begin_lsn Binary(10) = sys.fn_cdc_map_time_to_lsn(N'smallest greater than or equal', DATEADD(MINUTE, 30, sys.fn_cdc_map_lsn_to_time(@min_lsn)));
+	DECLARE @end_lsn Binary(10) = sys.fn_cdc_map_time_to_lsn(N'largest less than or equal', DATEADD(MINUTE, -30, sys.fn_cdc_map_lsn_to_time(@max_lsn)));
+	DECLARE @previousdate Binary(10) = sys.fn_cdc_map_time_to_lsn(N'smallest greater than or equal', DATEADD(DAY, -1, GETDATE()));
+	DECLARE @currentdate Binary(10) = sys.fn_cdc_map_time_to_lsn(N'largest less than or equal', GETDATE());
+
+	DECLARE @col_businessEntityID Int = sys.fn_cdc_get_column_ordinal('Person_BusinessEntity', 'BusinessEntityID');
+	DECLARE @col_rowguid Int = sys.fn_cdc_get_column_ordinal('Person_BusinessEntity', 'rowguid');
+	DECLARE @col_modifiedDate Int = sys.fn_cdc_get_column_ordinal('Person_BusinessEntity', 'ModifiedDate');
+	DECLARE @col_text Int = sys.fn_cdc_get_column_ordinal('Person_BusinessEntity', 'text');
+	
 	SELECT 
 		sys.fn_cdc_map_lsn_to_time(__$start_lsn) AS [commit time],
 		__$start_lsn AS [LSN],
@@ -142,10 +148,59 @@ BEGIN TRY
 		ASCII(SUBSTRING(__$update_mask,1,1)) AS [bit masked],
 		BusinessEntityID,
 		rowguid,
-		ModifiedDate
-	FROM cdc.fn_cdc_get_all_changes_Person_BusinessEntity(@min_lsn, @max_lsn, 'all');
+		ModifiedDate,
+		text,
+		CASE sys.fn_cdc_is_bit_set(@col_businessEntityID, __$update_mask) 
+			WHEN 1 THEN N'True'
+			ELSE N'False'
+		END AS [is BusinessEntityID updated],
+		CASE sys.fn_cdc_is_bit_set(@col_rowguid, __$update_mask) 
+			WHEN 1 THEN N'True'
+			ELSE N'False'
+		END AS [is rowguid updated],
+		CASE sys.fn_cdc_is_bit_set(@col_modifiedDate, __$update_mask) 
+			WHEN 1 THEN N'True'
+			ELSE N'False'
+		END AS [is ModifiedDate updated],
+		CASE sys.fn_cdc_is_bit_set(@col_text, __$update_mask)
+			WHEN 1 THEN N'True'
+			ELSE N'False'
+		END AS [is text updated]
+	FROM cdc.fn_cdc_get_all_changes_Person_BusinessEntity(@min_lsn, @max_lsn, 'all update old'); -- row filter options: all, all update old
 
-	SELECT * FROM cdc.fn_cdc_get_all_changes_Person_BusinessEntity(@begin_lsn, @end_lsn, 'all update old');
+	SELECT
+		sys.fn_cdc_map_lsn_to_time(__$start_lsn) AS [commit time],
+		CASE __$operation
+			WHEN 1 THEN N'Delete'
+			WHEN 2 THEN N'Insert'
+			WHEN 3 THEN N'Before Update'
+			WHEN 4 THEN N'After Update'
+			WHEN 5 THEN N'Insert or Update'
+			ELSE ''
+		END AS [operation],
+		__$update_mask AS [bit masked],
+		BusinessEntityID,
+		rowguid,
+		ModifiedDate,
+		text,
+		CASE sys.fn_cdc_is_bit_set(@col_businessEntityID, __$update_mask) 
+			WHEN 1 THEN N'True'
+			ELSE N'False'
+		END AS [is BusinessEntityID updated],
+		CASE sys.fn_cdc_is_bit_set(@col_rowguid, __$update_mask) 
+			WHEN 1 THEN N'True'
+			ELSE N'False'
+		END AS [is rowguid updated],
+		CASE sys.fn_cdc_is_bit_set(@col_modifiedDate, __$update_mask) 
+			WHEN 1 THEN N'True'
+			ELSE N'False'
+		END AS [is ModifiedDate updated],
+		CASE sys.fn_cdc_is_bit_set(@col_text, __$update_mask)
+			WHEN 1 THEN N'True'
+			ELSE N'False'
+		END AS [is text updated]
+	FROM cdc.fn_cdc_get_net_changes_Person_BusinessEntity(@max_lsn, @max_lsn, 'all with mask')
+	WHERE BusinessEntityID = 21879; -- row filter options: all, all with mask, all with merge
 
 	-- Example of relational operator 'smallest greater than' and 'smallest greater than or equal'
 	-- '2026-03-19 10:48:34.170' - min_lsn
@@ -161,6 +216,8 @@ BEGIN CATCH
 	PRINT 'Error Messages: ' + ERROR_MESSAGE();
 	THROW;
 END CATCH
+-- ============================================================================================================================================================================
+=======
 
 
 -- JOIN CHANGE DATA WITH OTHER DATA FROM THE SAME TRANSACTION
