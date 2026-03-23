@@ -201,6 +201,14 @@ BEGIN TRY
 		END AS [is text updated]
 	FROM cdc.fn_cdc_get_net_changes_Person_BusinessEntity(@max_lsn, @max_lsn, 'all with mask')
 	WHERE BusinessEntityID = 21879; -- row filter options: all, all with mask, all with merge
+
+	-- Example of relational operator 'smallest greater than' and 'smallest greater than or equal'
+	-- '2026-03-19 10:48:34.170' - min_lsn
+	--'2026-03-19 10:48:34.407' - 'smallest greater than' min_lsn
+	--'2026-03-19 10:48:34.170' - 'smallest greater than or equal' min_lsn
+	SELECT sys.fn_cdc_map_lsn_to_time(sys.fn_cdc_get_min_lsn('Person_BusinessEntity'))
+	SELECT sys.fn_cdc_map_lsn_to_time(sys.fn_cdc_map_time_to_lsn('smallest greater than', sys.fn_cdc_map_lsn_to_time(sys.fn_cdc_get_min_lsn('Person_BusinessEntity'))))
+	SELECT sys.fn_cdc_map_lsn_to_time(sys.fn_cdc_map_time_to_lsn('smallest greater than or equal', sys.fn_cdc_map_lsn_to_time(sys.fn_cdc_get_min_lsn('Person_BusinessEntity'))))
 END TRY
 BEGIN CATCH
 	-- The cause of error could be validity interval is not valid
@@ -208,10 +216,26 @@ BEGIN CATCH
 	PRINT 'Error Messages: ' + ERROR_MESSAGE();
 	THROW;
 END CATCH
-
--- Example of relational operator 'smallest greater than' and 'smallest greater than or equal'
---'2026-03-19 10:48:34.170'
---'2026-03-19 10:48:34.407' - 'smallest greater than'
---'2026-03-19 10:48:34.170' - 'smallest greater than or equal'
-select sys.fn_cdc_map_lsn_to_time(sys.fn_cdc_map_time_to_lsn('smallest greater than or equal', sys.fn_cdc_map_lsn_to_time(sys.fn_cdc_get_min_lsn('Person_BusinessEntity'))))
 -- ============================================================================================================================================================================
+=======
+
+
+-- JOIN CHANGE DATA WITH OTHER DATA FROM THE SAME TRANSACTION
+-- Use cdc.lsn_time_mapping to map Change capture LSN with Transaction commit LSN
+-- Query change data that associated with the Transaction commit LSN
+DECLARE @from_lsn binary(10),
+	@to_lsn binary(10),
+	@database_transaction_begin_lsn numeric(25,0)
+;
+SET @from_lsn = sys.fn_cdc_get_min_lsn('Person_BusinessEntity')
+SET @to_lsn = sys.fn_cdc_get_max_lsn()
+SET @database_transaction_begin_lsn = (SELECT TOP 1 database_transaction_begin_lsn FROM sys.dm_tran_database_transactions)
+;
+SELECT q.*
+FROM cdc.fn_cdc_get_all_changes_Person_BusinessEntity(@from_lsn, @to_lsn, N'all') q
+INNER JOIN cdc.lsn_time_mapping m ON q.__$start_lsn = m.start_lsn
+WHERE m.tran_begin_lsn = dbo.fn_convertnumericlsntobinary(@database_transaction_begin_lsn)
+
+select * from cdc.fn_cdc_get_all_changes_Person_BusinessEntity(sys.fn_cdc_get_min_lsn('Person_BusinessEntity'), sys.fn_cdc_get_max_lsn(), N'all')
+select * from cdc.lsn_time_mapping
+select * FROM sys.dm_tran_database_transactions
