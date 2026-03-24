@@ -1,0 +1,10 @@
+<products>
+  <product id="1">
+    <name>Café au lait</name>
+    <price>2.50</price>
+  </product>
+  <product id="2">
+    <name>Crème brûlée</name>
+    <price>5.00</price>
+  </product>
+</products>
