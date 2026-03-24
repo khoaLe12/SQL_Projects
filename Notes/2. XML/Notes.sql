@@ -8,13 +8,16 @@
 --	+ Enhancements to OPENROWSET to allow bulk loading of XML data.
 --	+ The ability to parse between relational data and XML data
 --	+ XML columns can be compressed and indexed.
--- 2. Adventages of using XML data
---	+ The structure is effecient for fine-grained query like extracting some of the sections of within XML document.
---	+ Effectively modifying/inserting new sections without replacing whole document, performed in a transacted way.
---	+ Preserve the document order, and elements and attributes values.
+--	+ Preserve the document order and document structure, elements and attributes values, namespace prefixes, and XML declaration.
+--	+ The structure is effecient for fine-grained query like extracting some of the sections within XML document using predicate evaluation.
+--	+ Effectively modifying/inserting new sections without replacing whole document, and the oprerations are performed in a transacted way.
+--	+ Guarantee the XML data format by validate input with XML schemas.
+--	+ Indexes on XML data type increases the query processing.
+--	+ More flexible than relational structure if the structure is frequently changed.
 -- 3. XML storage options:
---	+ Native storage as xml data type: 
-
+--	+ Natively store xml data type, improves parsing speed significantly through PSVI
+--	+ Using an annotated schema (AXSD) to decompose XML into columns, create a copy of XML data (called XML view) is stored at the relational level.
+--	+ Data is stored as large object storage, [n]varchar(max) and varbinary(max) which create an identical copy of data. 
 -- 4. Typed XML instance has a collection of XML schema associated with it, provide more benefits compared to untyped XML.
 --	+ The XML schema collection can be associated with variables, parameters, or columns of the xml data type.
 --	+ The ability to define validation constraints when creating or modifying XML instance.
