@@ -36,12 +36,17 @@
 --		+ Rows store all informations of a node: tag/element/attribute name, node type and its value, document order, path from node to the root
 --		+ This stored information help query engine to quickly locate the specific node through its name and path.
 --		+ Persist the representation of XML, avoid shredding XML binary large objects at run time.
---	+ The seondary indexes store additional data of XML, they are divided into three main types:
+--	+ The seondary indexes store additional data of XML, built from primary XML index, they are divided into three main types:
 --		+ PATH secondary XML index: significantly speed up query that searching for paths
 --		+ VALUE secondary XML index: benefits from querying specific node value without knowing the element and attribute names of the node, and the path is not fully specified or it includes a wildcard.
---		+ PROPERTY secondary XML index: 
+--		+ PROPERTY secondary XML index: best use in scenario of querying one or more values of object using value() method in the SELECT statement.
+--	+ The Selective XML indexes:
+--		+ 
 -- 6. XML compression
---	+ 
+--	+ Compress the XML data to a compressed format, but doesn't change XML data syntax and semantics.
+--	+ XML data is compressed with the Xpress Compression Algorithm.
+--	+ XML indexes are compressed using data compression.
+
 
 
 
@@ -54,7 +59,7 @@ GO
 -- Create instances of XML data
 SELECT CONVERT(XML, '<Cust><Fname>Andrew</Fname><Lname>Fuller</Lname></Cust>');
 GO
-
+;
 SELECT 
 	DepartmentID,
 	Name,
@@ -63,7 +68,7 @@ SELECT
 FROM HumanResources.Department
 FOR XML AUTO, TYPE
 GO
-
+;
 DECLARE @s varchar(MAX) = 
 N'<products>
   <product id="1">
@@ -79,17 +84,17 @@ SELECT CAST(
 	CAST(('<?xml version="1.0" encoding="iso8859-1"?>' + @s) AS VARBINARY (MAX)) 
 	AS XML) AS [xml data with encoding ISO‑8859‑1]
 GO
-
+;
 SELECT BulkColumn AS [binary data stream]
 FROM OPENROWSET(
-	BULK 'D:\0. Khoa\0. SQL Projects\Notes\2. XML\SampleData1.txt',
+	BULK 'D:\Projects\SQL-Projects\Notes\2. XML\SampleData1.txt',
 	SINGLE_BLOB
 ) AS x
 GO
-
+;
 SELECT CONVERT(XML, BulkColumn, 2) AS [xml data with DTD]
 FROM OPENROWSET(
-	BULK 'D:\0. Khoa\0. SQL Projects\Notes\2. XML\SampleData2.txt',
+	BULK 'D:\Projects\SQL-Projects\Notes\2. XML\SampleData2.txt',
 	SINGLE_BLOB
 ) AS x
 GO
@@ -102,12 +107,13 @@ AS BEGIN
 	RETURN @var.exist('/ProductDescription/@ProductID')
 END;
 GO
-
+;
 CREATE TABLE T1 (
+	Pk Int PRIMARY KEY IDENTITY(1,1),
 	Col1 XML CHECK(dbo.afCheckExistsA_ProductID(Col1) = 1)
 )
 GO
-
+;
 INSERT INTO T1 VALUES('<ProductDescription ProductID="1" />');
 GO
 
@@ -116,22 +122,67 @@ GO
 DECLARE @x1 XML (DOCUMENT Production.ProductDescriptionSchemaCollection) ;
 DECLARE @x2 XML (CONTENT Production.ProductDescriptionSchemaCollection);
 GO
-
+;
 CREATE TABLE T2(
 	Col1 Int,
 	Col2 XML (Production.ProductDescriptionSchemaCollection) NOT NULL DEFAULT CAST(N'<element1></element1>' AS XML)
 )
 GO
-
+;
 CREATE PROCEDURE SampleProc
 	@x XML (Production.ProductDescriptionSchemaCollection)
 AS
 GO
 
 
--- Query XML
+-- Create primary/secondary XML indexes
+CREATE PRIMARY XML INDEX Idx_T1_Col1 ON T1(Col1)
+GO
+;
+CREATE XML INDEX Idx_T1_Col1_PATH ON T1(Col1)
+USING XML INDEX Idx_T1_Col1
+FOR PATH
+GO
+;
+CREATE XML INDEX Idx_T1_Col1_VALUE ON T1(Col1)
+USING XML INDEX Idx_T1_Col1
+FOR VALUE
+GO
+;
+CREATE XML INDEX Idx_T1_Col1_PROPERTY ON T1(Col1)
+USING XML INDEX Idx_T1_Col1
+FOR PROPERTY
+GO
+
+
+-- Get information about XML indexes
+SELECT 
+	OBJECT_NAME(object_id) AS [table],
+	name AS [index name],
+	type_desc AS [index type]
+FROM sys.indexes
+WHERE [type] = 3
+GO
+;
+SELECT 
+	OBJECT_NAME(object_id) AS [table],
+	name AS [index name],
+	CASE
+		WHEN secondary_type IS NULL THEN N'True'
+		ELSE N'False'
+	END AS [is primary xml index],
+	CASE secondary_type
+		WHEN 'P' THEN N'PATH'
+		WHEN 'R' THEN N'PROPERTY'
+		WHEN 'V' THEN N'VALUE'
+		ELSE N''
+	END AS [seconary index type]
+FROM sys.xml_indexes;
+GO
+
+
 -- Add namespaces to queries
-WITH XMLNAMESPACES ('uri' AS ns1)
+;WITH XMLNAMESPACES ('uri' AS ns1)
 SELECT
 	ProductID AS 'ns1:ProductID',
 	Name AS 'ns1:Name',
@@ -139,6 +190,7 @@ SELECT
 FROM Production.Product
 WHERE ProductID IN (316, 317)
 FOR XML RAW ('ns1:Prod'), ELEMENTS;
+GO
 
 
 -- XML Modification
