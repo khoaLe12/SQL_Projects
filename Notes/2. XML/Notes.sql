@@ -46,8 +46,28 @@
 --	+ Compress the XML data to a compressed format, but doesn't change XML data syntax and semantics.
 --	+ XML data is compressed with the Xpress Compression Algorithm.
 --	+ XML indexes are compressed using data compression.
-
-
+-- 7. XML Schemas (XSD)
+--	+ XML Schema collection contains a list of XML schemas, used to validate XML instances.
+--	+ XML schema collection is a metadata of an instance, define all the data type information for the instance data.
+--	+ XML schema can contains a various components like ELEMENT, ATTRIBUTE, SIMPLE TYPE, COMPLEX TYPE, ATTRIBUTEGROUP, MODELGROUP
+--	+ SQL Server stores the defined components instead of XML it self.
+--  +
+-- 8. FOR XML
+--  + SQL Server provides the FOR XML clause to parse the rowset results into XML document.
+--  + The shape of the resulting XML can be explicitly specified with RAW, AUTO, EXPLICIT, or PATH modes.
+--      + Use RAW[('ElementName')] mode to generates a single element per row, or construct XML hierarchy be writing nested FOR XML queries; by default the element tag use the identifier <row>.
+--      + Use AUTO mode to generate nesting XML, the shape is defined by the way the SELECT statement is specified.
+--      + Use EXPLICIT mode to mix attributes and elements, this mode allows to create more complex shape (wrapper, nested properties, space-seperated values, mixed contents), but often result in cumbersome queries.
+--      + Use PATH[('ElementName')] mode with the nested FOR XML query capability as a simpler alternative to the EXPLICIT mode; by default the mode generate a <row> element wrapper for each row, no wrapper element is generated if empty string is used.
+--  + To defined the format of XML data, SQL Server support the following directives:
+--      + MLDATA specifies that an inline XML-Data Reduced (XDR) schema should be returned.
+--      + XMLSCHEMA returns an inline W3C XML Schema (XSD).
+--      + ELEMENTS to format columns as subelements, this option is supported in RAW, AUTO, and PATH modes only.
+--      + TYPE specify that the query returns the results as the xml type; if not specified, the XML data returned to client as a string type.
+--      + ROOT[('RootName')] specify that a single, top-level element is added to the result, the default value is <root>.
+--      + BINARY BASE64 tell the returned binary data is represented in base64-encoded format.
+--      + XSINIL specifies that an element that has an xsi:nil attribute set to TRUE be created for NULL column values; this option can only be used with ELEMENTS directive.
+--      + ABSENT is used with ELEMENTS directive by default, it specifies that no elements are created for NULL values.
 
 
 
@@ -56,19 +76,195 @@ USE AdventureWorks2025
 GO
 
 
--- Create instances of XML data
-SELECT CONVERT(XML, '<Cust><Fname>Andrew</Fname><Lname>Fuller</Lname></Cust>');
+
+
+-- Create XML Schema collections
+CREATE XML SCHEMA COLLECTION XSD1 
+	AS N'<?xml version="1.0" encoding="UTF-16"?>
+    <xsd:schema targetNamespace="schema1" xmlns="schema1" xmlns:schema1="schema1"
+        elementFormDefault="qualified"
+        attributeFormDefault="unqualified"
+        xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+        <xsd:complexType name="BonusItem">
+            <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                <xsd:element name="Item1">
+                    <xsd:complexType>
+                        <xsd:attribute name="id" type="xsd:string" use="required"/>
+                        <xsd:attribute name="quantity" type="xsd:integer" use="optional"/>
+                    </xsd:complexType>
+                </xsd:element>
+                <xsd:element name="Item2">
+                    <xsd:complexType>
+                        <xsd:attribute name="id" type="xsd:string" use="required"/>
+                        <xsd:attribute name="quantity" type="xsd:integer" use="optional"/>
+                    </xsd:complexType>
+                </xsd:element>
+                <xsd:element name="Item3">
+                    <xsd:complexType>
+                        <xsd:attribute name="id" type="xsd:string" use="required"/>
+                        <xsd:attribute name="quantity" type="xsd:integer" use="optional"/>
+                    </xsd:complexType>
+                </xsd:element>
+            </xsd:choice>
+        </xsd:complexType>
+
+        <xsd:complexType name="ProductType">
+            <xsd:sequence>
+                <xsd:element name="ProductName" type="xsd:string"/>
+                <xsd:element name="Price" type="xsd:decimal"/>
+                <xsd:element name="Quantity" type="xsd:integer"/>
+                <xsd:element name="Category" type="xsd:string"/>
+                <xsd:element name="Promotion" type="xsd:boolean"/>
+                <xsd:element name="BonusItems" type="schema1:BonusItem"/>
+            </xsd:sequence>
+        </xsd:complexType>
+
+        <xsd:simpleType name="PaymentType">
+            <xsd:restriction base="xsd:string">
+                <xsd:enumeration value="cash"/>
+                <xsd:enumeration value="card"/>
+            </xsd:restriction>
+        </xsd:simpleType>
+
+        <xsd:element name="root">
+            <xsd:complexType>
+                <xsd:sequence>
+                    <xsd:element name="Order" minOccurs="0" maxOccurs="unbounded">
+                        <xsd:complexType>
+                            <xsd:sequence>
+                                <xsd:element name="Product" type="schema1:ProductType" minOccurs="1" maxOccurs="unbounded"/>
+                            </xsd:sequence>
+                            <xsd:attribute name="OrderID" type="xsd:integer" use="required"/>
+                            <xsd:attribute name="OrderDate" type="xsd:dateTime" use="optional"/>
+                            <xsd:attribute name="TotalPrice" type="xsd:decimal" use="optional"/>
+                            <xsd:attribute name="PaymentType" type="schema1:PaymentType" use="optional"/>
+                        </xsd:complexType>
+                    </xsd:element>
+                </xsd:sequence>
+                <xsd:attribute name="ImportID" type="xsd:string" use="required"/>
+            </xsd:complexType>
+        </xsd:element>
+    </xsd:schema>';
 GO
-;
-SELECT 
-	DepartmentID,
-	Name,
-	GroupName,
-	ModifiedDate
+
+CREATE XML SCHEMA COLLECTION XSD2 
+    AS N'<xsd:schema targetNamespace="schema2a" xmlns="schema2a" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <xsd:element name="Element1" type="xsd:string" />
+    </xsd:schema>
+    <xsd:schema targetNamespace="schema2b" xmlns="schema2b" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <xsd:element name="Element2" type="xsd:integer" />
+    </xsd:schema>'
+GO
+
+
+
+
+-- Specify constraints for XML data type column
+CREATE OR ALTER FUNCTION dbo.afCheckExists_CustomerID(@var XML)
+RETURNS Bit
+AS BEGIN
+	IF @var.exist('/Customer/@CustomerID') = 1 AND @var.exist('/Customer/CustomerName') = 1
+        RETURN 1;
+    RETURN 0;
+END;
+GO
+
+
+
+
+-- Declare XML data type variable/parameter/column (with/without XSD, XML constraints)
+DECLARE @xml1 XML(DOCUMENT XSD2); 
+GO
+
+DECLARE @xml2 XML(CONTENT XSD2); 
+GO
+
+CREATE OR ALTER PROCEDURE [dbo].[ProcX] @xml XML(XSD2) AS;
+GO
+
+IF OBJECT_ID('dbo.XMLDemo', 'U') IS NOT NULL DROP TABLE dbo.XMLDemo
+CREATE TABLE dbo.XMLDemo (
+    ID Int Identity(1,1) NOT NULL PRIMARY KEY,
+    Orders XML (DOCUMENT XSD1) NOT NULL DEFAULT CAST(N'<?xml version="1.0" encoding="UTF-16"?><root xmlns="schema1" ImportID="IMP001"></root>' AS XML),
+    Customer XML CHECK(dbo.afCheckExists_CustomerID(Customer) = 1) NOT NULL DEFAULT CAST(N'<Customer CustomerID="0"><CustomerName></CustomerName></Customer>' AS XML) 
+)
+GO
+
+
+
+
+-- Create primary/secondary XML indexes ON XML data type column
+CREATE PRIMARY XML INDEX Idx_XMLDemo_Orders ON XMLDemo(Orders)
+GO
+
+CREATE XML INDEX Idx_XMLDemo_Orders_PATH ON XMLDemo(Orders)
+USING XML INDEX Idx_XMLDemo_Orders
+FOR PATH
+GO
+
+CREATE XML INDEX Idx_XMLDemo_Orders_VALUE ON XMLDemo(Orders)
+USING XML INDEX Idx_XMLDemo_Orders
+FOR VALUE
+GO
+
+CREATE XML INDEX Idx_XMLDemo_Orders_PROPERTY ON XMLDemo(Orders)
+USING XML INDEX Idx_XMLDemo_Orders
+FOR PROPERTY
+GO
+
+
+
+
+-- Instantiate XML data
+DECLARE @xml1 XML(DOCUMENT XSD2); 
+DECLARE @xml2 XML(CONTENT XSD2); 
+SET @xml1 = CAST(N'<Element1 xmlns="schema2a">Content</Element1>' AS XML)
+SET @xml2 = CAST(N'<Element1 xmlns="schema2a">Content</Element1><Element2 xmlns="schema2b">1</Element2>' AS XML)
+GO
+
+INSERT INTO dbo.XMLDemo(Orders, Customer)
+VALUES(N'<?xml version="1.0" encoding="UTF-16"?>
+    <root xmlns="schema1" xmlns:ns="schema1" ImportID="IMP001">
+        <ns:Order OrderID="1" OrderDate="2026-03-29T09:30:00" TotalPrice="199.99" PaymentType="card">
+            <Product>
+                <ProductName>Wireless Mouse</ProductName>
+                <Price>99.99</Price>
+                <Quantity>2</Quantity>
+                <Category>Electronics</Category>
+                <Promotion>true</Promotion>
+                <BonusItems>
+                    <Item1 id="MOUSEPAD01" quantity="1"/>
+                </BonusItems>
+            </Product>
+        </ns:Order>
+        <ns:Order OrderID="2">
+            <Product>
+                <ProductName>Laptop</ProductName>
+                <Price>170.00</Price>
+                <Quantity>1</Quantity>
+                <Category>Computers</Category>
+                <Promotion>false</Promotion>
+                <BonusItems />
+            </Product>
+            <Product>
+                <ProductName>SmartPhone</ProductName>
+                <Price>120.00</Price>
+                <Quantity>1</Quantity>
+                <Category>Phones</Category>
+                <Promotion>false</Promotion>
+                <BonusItems />
+            </Product>
+        </ns:Order>
+    </root>',
+    DEFAULT)
+GO
+
+SELECT DepartmentID, Name, GroupName, ModifiedDate 
 FROM HumanResources.Department
 FOR XML AUTO, TYPE
 GO
-;
+
 DECLARE @s varchar(MAX) = 
 N'<products>
   <product id="1">
@@ -84,14 +280,14 @@ SELECT CAST(
 	CAST(('<?xml version="1.0" encoding="iso8859-1"?>' + @s) AS VARBINARY (MAX)) 
 	AS XML) AS [xml data with encoding ISO‑8859‑1]
 GO
-;
+
 SELECT BulkColumn AS [binary data stream]
 FROM OPENROWSET(
 	BULK 'D:\Projects\SQL-Projects\Notes\2. XML\SampleData1.txt',
 	SINGLE_BLOB
 ) AS x
 GO
-;
+
 SELECT CONVERT(XML, BulkColumn, 2) AS [xml data with DTD]
 FROM OPENROWSET(
 	BULK 'D:\Projects\SQL-Projects\Notes\2. XML\SampleData2.txt',
@@ -100,59 +296,32 @@ FROM OPENROWSET(
 GO
 
 
--- Specify constraint for XML column
-CREATE OR ALTER FUNCTION dbo.afCheckExistsA_ProductID(@var XML)
-RETURNS Bit
-AS BEGIN
-	RETURN @var.exist('/ProductDescription/@ProductID')
-END;
-GO
-;
-CREATE TABLE T1 (
-	Pk Int PRIMARY KEY IDENTITY(1,1),
-	Col1 XML CHECK(dbo.afCheckExistsA_ProductID(Col1) = 1)
-)
-GO
-;
-INSERT INTO T1 VALUES('<ProductDescription ProductID="1" />');
+
+
+-- Get information about XML schemas and schema collections
+SELECT 
+    'Get namespaces of a collection' AS [content],
+    XSC.name AS [collection name],
+    XSN.name AS [schema name/namespace],
+    NULL AS XSD
+FROM sys.xml_schema_collections XSC
+INNER JOIN sys.xml_schema_namespaces XSN ON XSN.xml_collection_id = XSC.xml_collection_id
+WHERE XSC.name = 'XSD1'
+UNION ALL
+SELECT 
+    N'Get contents of a collection',
+    N'XSD1',
+    NULL,
+    XML_SCHEMA_NAMESPACE (N'dbo', N'XSD1')
+UNION ALL
+SELECT 
+    N'Output a specified schema from an XML schema collection',
+    N'XSD2',
+    N'schema2b',
+    XML_SCHEMA_NAMESPACE(N'dbo', N'XSD2', 'schema2b')
 GO
 
 
--- Associating a schema collection with a typed XML variable, parameter, column
-DECLARE @x1 XML (DOCUMENT Production.ProductDescriptionSchemaCollection) ;
-DECLARE @x2 XML (CONTENT Production.ProductDescriptionSchemaCollection);
-GO
-;
-CREATE TABLE T2(
-	Col1 Int,
-	Col2 XML (Production.ProductDescriptionSchemaCollection) NOT NULL DEFAULT CAST(N'<element1></element1>' AS XML)
-)
-GO
-;
-CREATE PROCEDURE SampleProc
-	@x XML (Production.ProductDescriptionSchemaCollection)
-AS
-GO
-
-
--- Create primary/secondary XML indexes
-CREATE PRIMARY XML INDEX Idx_T1_Col1 ON T1(Col1)
-GO
-;
-CREATE XML INDEX Idx_T1_Col1_PATH ON T1(Col1)
-USING XML INDEX Idx_T1_Col1
-FOR PATH
-GO
-;
-CREATE XML INDEX Idx_T1_Col1_VALUE ON T1(Col1)
-USING XML INDEX Idx_T1_Col1
-FOR VALUE
-GO
-;
-CREATE XML INDEX Idx_T1_Col1_PROPERTY ON T1(Col1)
-USING XML INDEX Idx_T1_Col1
-FOR PROPERTY
-GO
 
 
 -- Get information about XML indexes
@@ -163,7 +332,7 @@ SELECT
 FROM sys.indexes
 WHERE [type] = 3
 GO
-;
+
 SELECT 
 	OBJECT_NAME(object_id) AS [table],
 	name AS [index name],
@@ -181,8 +350,10 @@ FROM sys.xml_indexes;
 GO
 
 
--- Add namespaces to queries
-;WITH XMLNAMESPACES ('uri' AS ns1)
+
+
+-- XML QUERIES
+WITH XMLNAMESPACES ('uri' AS ns1)
 SELECT
 	ProductID AS 'ns1:ProductID',
 	Name AS 'ns1:Name',
@@ -191,6 +362,31 @@ FROM Production.Product
 WHERE ProductID IN (316, 317)
 FOR XML RAW ('ns1:Prod'), ELEMENTS;
 GO
+
+SELECT (
+    SELECT BusinessEntityID, FirstName, LastName
+    FROM Person.Person
+    FOR XML AUTO, TYPE
+).query('/Person.Person[1]');
+GO
+
+DECLARE @x nvarchar(100) =
+(
+    SELECT 
+        ID,
+        Orders.query('
+        declare namespace ns="schema1";
+        //ns:Order') AS Orders,
+        Customer
+    FROM XMLDemo root
+    FOR XML AUTO, TYPE
+).value('
+    declare namespace ns="schema1";
+    (/root/Orders/ns:Order[@OrderID="2"]/ns:Product[1]/ns:ProductName/text())[1]', 
+    'nvarchar(100)');
+SELECT @x AS [Name of the first product of Order with OrderID = "2"];
+GO
+
 
 
 -- XML Modification
