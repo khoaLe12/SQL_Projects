@@ -57,7 +57,7 @@
 --  + The shape of the resulting XML can be explicitly specified with RAW, AUTO, EXPLICIT, or PATH modes.
 --      + Use RAW[('ElementName')] mode to generates a single element per row, or construct XML hierarchy be writing nested FOR XML queries; by default the element tag use the identifier <row>.
 --      + Use AUTO mode to generate nesting XML, the shape is defined by the way the SELECT statement is specified.
---      + Use EXPLICIT mode to mix attributes and elements, this mode allows to create more complex shape (wrapper, nested properties, space-seperated values, mixed contents), but often result in cumbersome queries.
+--      + Use EXPLICIT mode to mix attributes and elements, this mode allows to create more complex shape of XML (wrapper, nested properties, space-seperated values, mixed contents), but often result in cumbersome queries.
 --      + Use PATH[('ElementName')] mode with the nested FOR XML query capability as a simpler alternative to the EXPLICIT mode; by default the mode generate a <row> element wrapper for each row, no wrapper element is generated if empty string is used.
 --  + To defined the format of XML data, SQL Server support the following directives:
 --      + MLDATA specifies that an inline XML-Data Reduced (XDR) schema should be returned.
@@ -68,6 +68,8 @@
 --      + BINARY BASE64 tell the returned binary data is represented in base64-encoded format.
 --      + XSINIL specifies that an element that has an xsi:nil attribute set to TRUE be created for NULL column values; this option can only be used with ELEMENTS directive.
 --      + ABSENT is used with ELEMENTS directive by default, it specifies that no elements are created for NULL values.
+-- 9. OPENXML
+--	+ 
 
 
 
@@ -353,6 +355,7 @@ GO
 
 
 -- XML QUERIES
+-- WITH NAMESPACE
 WITH XMLNAMESPACES ('uri' AS ns1)
 SELECT
 	ProductID AS 'ns1:ProductID',
@@ -363,6 +366,7 @@ WHERE ProductID IN (316, 317)
 FOR XML RAW ('ns1:Prod'), ELEMENTS;
 GO
 
+-- RAW mode
 SELECT (
     SELECT BusinessEntityID, FirstName, LastName
     FROM Person.Person
@@ -385,6 +389,167 @@ DECLARE @x nvarchar(100) =
     (/root/Orders/ns:Order[@OrderID="2"]/ns:Product[1]/ns:ProductName/text())[1]', 
     'nvarchar(100)');
 SELECT @x AS [Name of the first product of Order with OrderID = "2"];
+GO
+
+-- AUTO mode
+SELECT 
+	IndividualCustomer.CustomerID, 
+	IndividualCustomer.Name,
+	IndividualCustomer.NoOfOrders,
+	SOH.SalesOrderID,
+	SOD.SalesOrderDetailID,
+	SOD.LineTotal,
+	SOD.ProductID,
+	SOD.OrderQty,
+	P.Name
+FROM (
+	SELECT 
+		C.CustomerID, 
+		P.FirstName + ' ' + P.LastName AS Name,
+		COUNT(*) AS NoOfOrders
+	FROM Sales.Customer AS C
+	INNER JOIN Person.Person AS P ON p.BusinessEntityID = C.PersonID
+	INNER JOIN Sales.SalesOrderHeader SOH ON SOH.CustomerID = C.CustomerID
+	WHERE C.CustomerID IN (29672, 29734)
+	GROUP BY C.CustomerID, P.FirstName, P.LastName
+) AS IndividualCustomer
+INNER JOIN Sales.SalesOrderHeader SOH ON SOH.CustomerID = IndividualCustomer.CustomerID
+INNER JOIN Sales.SalesOrderDetail AS SOD ON SOD.SalesOrderID = SOH.SalesOrderID
+INNER JOIN Production.Product AS P ON P.ProductID = SOD.ProductID
+ORDER BY IndividualCustomer.CustomerID, SOh.SalesOrderID
+FOR XML AUTO, ROOT;
+GO
+
+-- Nested AUTO mode
+SELECT XmlCol.query('<Root> { /* } </Root>')
+FROM (
+	SELECT 
+		(
+			SELECT 
+				TOP 2 SalesOrderID, SalesPersonID, CustomerID,
+				(
+					SELECT TOP 3 SalesOrderID, ProductID, OrderQty, UnitPrice
+					FROM Sales.SalesOrderDetail
+					WHERE SalesOrderDetail.SalesOrderID = SalesOrderHeader.SalesOrderID
+					FOR XML AUTO, TYPE
+				)
+			FROM Sales.SalesOrderHeader
+			WHERE Sales.SalesOrderHeader.SalesOrderID = SalesOrder.SalesOrderID
+			FOR XML AUTO, TYPE
+		),
+		(
+			SELECT * FROM 
+			(
+				SELECT SP.BusinessEntityID, E.NationalIDNumber
+				FROM Sales.SalesPerson SP
+				INNER JOIN HumanResources.Employee E ON E.BusinessEntityID = SP.BusinessEntityID
+			) AS SalesPerson
+			WHERE SalesPerson.BusinessEntityID = SalesOrder.SalesPersonID
+			FOR XML AUTO, TYPE
+		)
+	FROM (
+		SELECT SOH.SalesOrderID, SOH.SalesPersonID
+		FROM Sales.SalesOrderHeader SOH
+		INNER JOIN Sales.SalesPerson SP ON SP.BusinessEntityID = SOH.SalesPersonID
+	) AS SalesOrder
+	WHERE SalesOrder.SalesOrderID IN (43669, 43670)
+	ORDER BY SalesOrder.SalesOrderID
+	FOR XML AUTO, TYPE
+) AS T(XmlCol);
+GO
+
+-- PATH mode
+SELECT 
+	N'Columns without name' AS [content],
+	CAST((
+		SELECT 1, ', ', 2, ', ', 3, ', ', 4, ', ', 5, ', ', 6
+		FOR XML PATH('')
+	) AS XML) AS [XML PATH]
+UNION ALL
+SELECT
+	N'Complex query',
+	CAST((
+		SELECT 
+			ProductModelID AS '@ProductModelID',
+			(
+				SELECT ProductID AS 'data()'
+				FROM Production.Product
+				WHERE Production.Product.ProductModelID = Production.ProductModel.ProductModelID
+				FOR XML PATH('')
+			) AS '@ProductIDs',
+			[Name] AS 'Nested1/Nested2/@Name',
+			[Name] AS 'Nested1/Nested2/Name',
+			Instructions.query(
+				'declare namespace MI="http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelManuInstructions";
+				/MI:root/MI:Location
+				') AS ManuWorkCenterInformation,
+			Instructions.query(
+				'declare namespace MI="http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelManuInstructions";
+				/MI:root/MI:Location[1]
+				') -- query with no column name, same with wildcard character '*'
+		FROM Production.ProductModel
+		WHERE ProductModelID = 7
+		FOR XML PATH, ELEMENTS XSINIL
+	) AS XML)
+UNION ALL
+SELECT 
+	N'Complex query',
+	CAST((
+		SELECT 
+			P.BusinessEntityID AS '@PersonID',
+			'Example of using node tests such as text(), comment(), processing-instruction()' AS 'comment()',
+			'Some pi' AS 'processing-instruction(PI)',
+			P.FirstName AS 'Name/First/text()',
+			p.MiddleName AS 'Name/Middle',
+			p.LastName AS 'Name/Last',
+			ISNULL(P.FirstName + ' ', '') + ISNULL(P.MiddleName + ' ', ' ') + ISNULL(P.LastName, '') AS 'Fullname',
+			A.AddressLine1 AS 'Address/AddressLine1',
+			A.AddressLine2 AS 'Address/AddressLine2',
+			A.City AS 'Address/City'
+		FROM Person.Person P
+		INNER JOIN Person.BusinessEntityAddress B ON B.BusinessEntityID = P.BusinessEntityID
+		INNER JOIN Person.Address A ON A.AddressID = B.AddressID
+		WHERE P.BusinessEntityID IN (1, 2)
+		FOR XML PATH, ELEMENTS XSINIL
+	) AS XML)
+GO
+
+
+
+
+-- XML Parse using OPENXML
+CREATE OR ALTER PROCEDURE [dbo].[OPENXMLDemo]
+AS
+BEGIN
+	-- Create tables for later population using OPENXML.
+	CREATE TABLE Customers (CustomerID Varchar(20) PRIMARY KEY,
+					ContactName Varchar(20),
+					CompanyName Varchar(20));
+	CREATE TABLE Orders (CustomerID varchar(20), OrderDate Datetime);
+	
+	DECLARE @docHandle Int;
+	DECLARE @xmlDocument Nvarchar(MAX); -- or xml type
+	SET @xmlDocument = 
+	N'<ROOT>
+		<Customers CustomerID="XYZAA" ContactName="Joe" CompanyName="Company1">
+			<Orders CustomerID="XYZAA" OrderDate="2026-03-31T00:00:00" />
+			<Orders CustomerID="XYZAA" OrderDate="2026-03-30T00:00:00" />
+		</Customers>
+		<Customers CustomerID="XYZBB" ContactName="Steve" CompanyName="Company2">
+			No Orders yet!
+		</Customers>
+	</ROOT>';
+
+	EXEC sp_xml_preparedocument @docHandle OUTPUT, @xmlDocument;
+
+	-- Use OPENXML to provide rowset consisting of customer data.
+	INSERT Customers
+	SELECT * 
+	FROM OPENXML(@docHandle, N'/ROOT/Customers')
+	WITH Customers;
+
+	-- Use OPENXML to provide rowset consisting of order data.
+END
 GO
 
 
