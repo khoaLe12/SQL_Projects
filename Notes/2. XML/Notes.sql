@@ -69,7 +69,27 @@
 --      + XSINIL specifies that an element that has an xsi:nil attribute set to TRUE be created for NULL column values; this option can only be used with ELEMENTS directive.
 --      + ABSENT is used with ELEMENTS directive by default, it specifies that no elements are created for NULL values.
 -- 9. OPENXML
---	+ 
+--	+ Is a technique to parse in-memory XML documents into rowsets, similar to a table or a view.
+--	+ It creates an in-memory document object model(DOM) tree representation of the XML document.
+--	+ Used as a keyword that accepts some parameters and options:
+--		+ An XML document handle (idoc): is a DOM tree representation of an XML document, execute procedure sp_xml_preparedocument to prepare the document, use procedure sp_xml_removedocument to free the memory
+--		+ AN XPath expression: to identify the nodes to be mapped to row (rowpattern).
+--		+ A description of the rowset to be generated.
+--		+ Mapping between the rowset columns and the XML nodes.
+--	+ There are some options to specify a rowset description/schema:
+--		+ Use the edge table format: represents the fine-grained XML document structure, includes the element and attribute names, the document hierarchy, the namesaces, and the processing instructions.
+--		+ Use the WITH clause to specify an existing table: instruct OPENXML to refers to the schema of an existing table to generate the rowset.
+--		+ Use the WITH clasue to specify a schema: manually specify a complete schema, by defining column names, their data types, their mapping to the XML document with/without column pattern (ColPattern)
+--	+ Map between the rowset columns and the XML nodes
+--		+ In the OPENXML statement, use the flags parameter to explicitly specify the type of mapping:
+--			+ Value 1 for attribute-centric mapping.
+--			+ Value 2 for element-centric mapping.
+--			+ Value 3 indicates both 1 and 2.
+--			+ Value 8 means only unconsumed XML data should be added to the OverFlow column defined in the WITH clause.
+--			+ Value 9 indicates both 1 and 8.
+--			+ Value 10 indidates both 2 and 8.
+--			+ By default the value 1 is used.
+--		+ In the WITH clause, use the ColPattern parameter to flexibly specify the type of mapping; this will overwrites or enhances the default mapping indicated by the flags
 
 
 
@@ -354,7 +374,7 @@ GO
 
 
 
--- XML QUERIES
+-- FOR XML
 -- WITH NAMESPACE
 WITH XMLNAMESPACES ('uri' AS ns1)
 SELECT
@@ -518,14 +538,19 @@ GO
 
 
 -- XML Parse using OPENXML
-CREATE OR ALTER PROCEDURE [dbo].[OPENXMLDemo]
+CREATE OR ALTER PROCEDURE [dbo].[OPENXMLDemo1]
 AS
 BEGIN
 	-- Create tables for later population using OPENXML.
-	CREATE TABLE Customers (CustomerID Varchar(20) PRIMARY KEY,
+	IF OBJECT_ID('[dbo].[CustomersDemo]', 'U') IS NOT NULL
+		DROP TABLE [dbo].[CustomersDemo]
+	IF OBJECT_ID('[dbo].[OrdersDemo]', 'U') IS NOT NULL
+		DROP TABLE [dbo].[OrdersDemo]
+
+	CREATE TABLE [dbo].[CustomersDemo] (CustomerID Varchar(20) PRIMARY KEY,
 					ContactName Varchar(20),
 					CompanyName Varchar(20));
-	CREATE TABLE Orders (CustomerID varchar(20), OrderDate Datetime);
+	CREATE TABLE [dbo].[OrdersDemo] (CustomerID varchar(20), OrderDate Datetime);
 	
 	DECLARE @docHandle Int;
 	DECLARE @xmlDocument Nvarchar(MAX); -- or xml type
@@ -543,15 +568,110 @@ BEGIN
 	EXEC sp_xml_preparedocument @docHandle OUTPUT, @xmlDocument;
 
 	-- Use OPENXML to provide rowset consisting of customer data.
-	INSERT Customers
+	INSERT [dbo].[CustomersDemo]
 	SELECT * 
 	FROM OPENXML(@docHandle, N'/ROOT/Customers')
 	WITH Customers;
 
 	-- Use OPENXML to provide rowset consisting of order data.
+	INSERT [dbo].[OrdersDemo]
+	SELECT *
+	FROM OPENXML(@docHandle, N'//Orders')
+	WITH Orders;
+
+	-- Remove the internal representation of the XML document.
+	EXEC sp_xml_removedocument @docHandle
+
+	SELECT * FROM [dbo].[CustomersDemo]
+	SELECT * FROM [dbo].[OrdersDemo]
 END
 GO
 
+CREATE OR ALTER PROCEDURE [dbo].[OPENXMLDemo2]
+AS
+BEGIN
+	DECLARE @XmlDocumentHandle Int;
+	DECLARE @XmlDocument Nvarchar(1000);
+	SET @XmlDocument =
+		N'<ROOT>
+			<Customer>
+				<CustomerID>VINET</CustomerID>
+				<ContactName>Paul Henriot</ContactName>
+				<Order OrderID="10248" CustomerID="VINET" EmployeeID="5" OrderDate="1996-07-04T00:00:00">
+					<OrderDetail ProductID="11">
+						<Quantity>12</Quantity>
+						<Product ProductName="Phone" />
+					</OrderDetail>
+					<OrderDetail ProductID="42">
+						<Quantity>10</Quantity>
+						<Product ProductName="Watch" />
+					</OrderDetail>
+					Customer was very satisfied
+				</Order>
+			</Customer>
+			<Customer>
+				<CustomerID>LILAS</CustomerID>
+				<ContactName>Carlos Gonzalez</ContactName>
+				<Order OrderID="10283" CustomerID="LILAS" EmployeeID="3" OrderDate="1996-08-16T00:00:00">
+					<OrderDetail ProductID="72" TotalPayment="1000">
+						<Quantity>3</Quantity>
+						<Product ProductName="Laptop" />
+					</OrderDetail>
+					Happy Customer
+				</Order>
+			</Customer>
+		</ROOT>';
 
+	-- Create an internal representation of the XML document.
+	EXEC sp_xml_preparedocument @XmlDocumentHandle OUTPUT, @XmlDocument;
+
+	-- Execute a SELECT statement using OPENXML rowset provider.
+	SELECT *
+	FROM OPENXML (@XmlDocumentHandle, '/ROOT/Customer/Order/OrderDetail', 3)
+	WITH (CustomerID	Varchar(10) '../../CustomerID',
+		  ContactName	Varchar(20)	'../../ContactName',
+		  OrderID		Int			'../@OrderID',
+		  OrderDate		Datetime	'../@OrderDate',
+		  Comment		ntext		'../text()',
+		  ProductID		Int,
+		  Quantity		Int,
+		  ProductName	Varchar(20)	'Product/@ProductName');
+
+	-- Execute a SELECT statement using a rowpattern ending with an attribute
+	SELECT *
+	FROM OPENXML (@XmlDocumentHandle, '/ROOT/Customer/Order/OrderDetail/@ProductID')
+	WITH (ProductID Int '.',
+		  TotalPayment Decimal(19,4) '../@TotalPayment',
+		  Quantity Int '../Quantity',
+		  ProductName Varchar(20) '../Product/@ProductName');
+
+	-- Execute a SELECT statement returns all the columns in the edge table.
+	WITH CTE_Edge_Table AS (
+		SELECT id, parentid, nodetype, localname, prefix, namespaceuri, datatype, prev, text
+		FROM OPENXML (@XmlDocumentHandle, '/ROOT/Customer')
+	)
+	SELECT [text] AS [Edge table - Customer ID]
+	FROM CTE_Edge_Table
+	WHERE localname = '#text' AND parentid IN (SELECT id FROM CTE_Edge_Table WHERE localname = 'CustomerID' AND nodetype = 1);
+
+	-- Execute a SELECT statement using XML data type in the WITH clause
+	SELECT *
+	FROM OPENXML (@XmlDocumentHandle, '/ROOT/Customer', 10)
+	WITH (CustomerID	Varchar(10),
+		  xmlCustomerID	XML 'CustomerID',
+		  OverFlow XML '@mp:xmltext');
+
+	EXEC sp_xml_removedocument @XmlDocumentHandle;
+END
+GO
+
+EXEC [dbo].[OPENXMLDemo1]
+GO
+
+EXEC [dbo].[OPENXMLDemo2]
+GO
+
+select CAST('<binary>EjRWeJA=</binary>' AS XML).value('.', 'varbinary(max)')
+select CAST('<binary>EjRWeJA=</binary>' AS XML).value('.', 'varchar(max)')
 
 -- XML Modification

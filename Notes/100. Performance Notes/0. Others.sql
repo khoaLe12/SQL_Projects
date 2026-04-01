@@ -194,5 +194,3 @@ GO
 if object_id('tempdb..#temp') is not null
 	drop table #temp
 GO
-select * INTO #temp from dbo.ArCdKh 
-GO
