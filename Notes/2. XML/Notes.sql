@@ -387,25 +387,7 @@ WHERE ProductID IN (316, 317)
 FOR XML RAW ('ns1:Prod'), ELEMENTS XSINIL, ROOT;
 GO
 
-SELECT ProductModelID, Name
-FROM Production.ProductModel
-WHERE ProductModelID IN (122, 119)
-FOR XML RAW, XMLSCHEMA ('urn:extracted-schema'), ROOT('x');
-GO
-
-SELECT ProductPhotoID, ThumbNailPhoto
-FROM Production.ProductPhoto
-WHERE ProductPhotoID = 1
-FOR XML RAW, BINARY BASE64;
-
 -- RAW mode
-SELECT (
-    SELECT BusinessEntityID, FirstName, LastName
-    FROM Person.Person
-    FOR XML AUTO, TYPE
-).query('/Person.Person[1]');
-GO
-
 DECLARE @x nvarchar(100) =
 (
     SELECT 
@@ -683,7 +665,83 @@ GO
 EXEC [dbo].[OPENXMLDemo2]
 GO
 
-select CAST('<binary>EjRWeJA=</binary>' AS XML).value('.', 'varbinary(max)')
-select CAST('<binary>EjRWeJA=</binary>' AS XML).value('.', 'varchar(max)')
+
+
 
 -- XML Modification
+CREATE OR ALTER PROCEDURE [dbo].[XMLDMLDemo]
+AS
+BEGIN
+	DECLARE @myDoc XML;
+	SET @myDoc = 
+		N'<Root>
+			<ProductDescription ProductID="1" ProductName="Road Bile">
+				<Features>
+				</Features>
+			</ProductDescription>
+		</Root>';
+	
+	-- Insert first feature child
+	SET @myDoc.modify(
+		'insert <Maintenance>3 year parts and labor extended maintenance is available</Maintenance>
+		into (/Root/ProductDescription/Features)[1]'
+	);
+
+	-- Insert second feature at the first position
+	SET @myDoc.modify(
+		'insert <Warranty>1 year parts and labor</Warranty>
+		as first
+		into (/Root/ProductDescription/Features)[1]'
+	);
+
+	-- Insert third feature at the last position
+	SET @myDoc.modify(
+		'insert <Material>Aluminum</Material>
+		as last
+		into (/Root/ProductDescription/Features)[1]'
+	);
+
+	-- Insert fourth feature before the feature Material
+	SET @myDoc.modify(
+		'insert <BikeFrame>Strong long lasting</BikeFrame>
+		before (/Root/ProductDescription/Features/Material)[1]'
+	);
+
+	-- Insert multiple elements after the feature BikeFrame
+	DECLARE @newFeatures XML;
+	SET @newFeatures =
+		N'<Warranty2>1 year parts and labor</Warranty2>
+		<Maintenance2>3 year parts and labor extended maintenance is available</Maintenance2>';
+	SET @myDoc.modify(
+		'insert sql:variable("@newFeatures")
+		after (/Root/ProductDescription/Features/BikeFrame)[1]'
+	)
+
+	-- Insert attributes into a document
+	DECLARE @price Money = 20.00;
+	SET @myDoc.modify(
+		'insert (
+			attribute Price {sql:variable("@price")},
+			attribute Quantity {"5"}
+		)
+		into (/Root/ProductDescription[@ProductID=1])[1]'
+	);
+
+	-- Insert a comment node after features node
+	SET @myDoc.modify(
+		'insert <!-- some comment -->
+		after (/Root/ProductDescription/Features)[1]'
+	);
+
+	-- Insert a processing instruction at the start of the document
+	SET @myDoc.modify(
+		'insert <?Program = "Instructions.exe" ?>
+		before (/Root)[1]'
+	);
+
+	SELECT @myDoc;
+END
+GO
+
+EXEC [dbo].[XMLDMLDemo];
+GO
