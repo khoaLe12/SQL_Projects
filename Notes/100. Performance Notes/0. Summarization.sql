@@ -18,6 +18,15 @@
 --	+ New data is queried all the time -> focus on improving query on new data
 
 
+-- Apply Sharding and Replication
+-- 1. Replication is a technique that replicates the primary database
+--	+ The primary is responsible for handling all write/update requests
+--	+ The replicated databases is used to process query requests which are distributed to all replications -> improved read performance
+-- 2. Sharding is a technique that split database into smaller independent parts called shards
+--	+ Each shard is stored in seperate database servers -> effectively reduce stress compared to a single centralized database
+--	+ Require a good strategy to accurately identify shard key.
+
+
 
 -- Recompiled stored procedures if the database undergoes significant changes to its data or structure
 -- 1. This updates and optimized the procedure's query plan for those changes

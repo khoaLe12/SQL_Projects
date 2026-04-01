@@ -56,18 +56,19 @@
 --  + SQL Server provides the FOR XML clause to parse the rowset results into XML document.
 --  + The shape of the resulting XML can be explicitly specified with RAW, AUTO, EXPLICIT, or PATH modes.
 --      + Use RAW[('ElementName')] mode to generates a single element per row, or construct XML hierarchy be writing nested FOR XML queries; by default the element tag use the identifier <row>.
---      + Use AUTO mode to generate nesting XML, the shape is defined by the way the SELECT statement is specified.
+--      + Use AUTO mode to generate nesting XML, the shape is based on the order of tables identified by the columns specified in the SELECT clause.
 --      + Use EXPLICIT mode to mix attributes and elements, this mode allows to create more complex shape of XML (wrapper, nested properties, space-seperated values, mixed contents), but often result in cumbersome queries.
 --      + Use PATH[('ElementName')] mode with the nested FOR XML query capability as a simpler alternative to the EXPLICIT mode; by default the mode generate a <row> element wrapper for each row, no wrapper element is generated if empty string is used.
---  + To defined the format of XML data, SQL Server support the following directives:
+--  + To defined the format of XML data, SQL Server support the following directives/options:
 --      + MLDATA specifies that an inline XML-Data Reduced (XDR) schema should be returned.
---      + XMLSCHEMA returns an inline W3C XML Schema (XSD).
+--      + XMLSCHEMA is used to request an inline W3C XML Schema (XSD) built from result.
 --      + ELEMENTS to format columns as subelements, this option is supported in RAW, AUTO, and PATH modes only.
 --      + TYPE specify that the query returns the results as the xml type; if not specified, the XML data returned to client as a string type.
 --      + ROOT[('RootName')] specify that a single, top-level element is added to the result, the default value is <root>.
 --      + BINARY BASE64 tell the returned binary data is represented in base64-encoded format.
 --      + XSINIL specifies that an element that has an xsi:nil attribute set to TRUE be created for NULL column values; this option can only be used with ELEMENTS directive.
 --      + ABSENT is used with ELEMENTS directive by default, it specifies that no elements are created for NULL values.
+--  + Directives are seperated by comma(,); each option must be used with directive
 -- 9. OPENXML
 --	+ Is a technique to parse in-memory XML documents into rowsets, similar to a table or a view.
 --	+ It creates an in-memory document object model(DOM) tree representation of the XML document.
@@ -383,8 +384,19 @@ SELECT
 	Color AS 'ns1:Color'
 FROM Production.Product
 WHERE ProductID IN (316, 317)
-FOR XML RAW ('ns1:Prod'), ELEMENTS;
+FOR XML RAW ('ns1:Prod'), ELEMENTS XSINIL, ROOT;
 GO
+
+SELECT ProductModelID, Name
+FROM Production.ProductModel
+WHERE ProductModelID IN (122, 119)
+FOR XML RAW, XMLSCHEMA ('urn:extracted-schema'), ROOT('x');
+GO
+
+SELECT ProductPhotoID, ThumbNailPhoto
+FROM Production.ProductPhoto
+WHERE ProductPhotoID = 1
+FOR XML RAW, BINARY BASE64;
 
 -- RAW mode
 SELECT (
@@ -403,10 +415,10 @@ DECLARE @x nvarchar(100) =
         //ns:Order') AS Orders,
         Customer
     FROM XMLDemo root
-    FOR XML AUTO, TYPE
+    FOR XML RAW, TYPE
 ).value('
     declare namespace ns="schema1";
-    (/root/Orders/ns:Order[@OrderID="2"]/ns:Product[1]/ns:ProductName/text())[1]', 
+    (/row/Orders/ns:Order[@OrderID="2"][1]/ns:Product[1]/ns:ProductName[1]/text())[1]', 
     'nvarchar(100)');
 SELECT @x AS [Name of the first product of Order with OrderID = "2"];
 GO
