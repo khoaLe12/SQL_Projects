@@ -4,7 +4,7 @@
 -- 1. SQL Server provides a powerful platform to work with XML
 --	+ XML data can be stored natively in an xml data type column
 --	+ XML data can be typed according to a collection of XML schemas, or left untyped.
---	+ Support querying XML data through XQuery.
+--	+ Support querying XML data through XQuery language which its expression is based on the existsing XPath query language.
 --	+ Enhancements to OPENROWSET to allow bulk loading of XML data.
 --	+ The ability to parse between relational data and XML data
 --	+ XML columns can be compressed (starting with SQL Server 2022) and indexed.
@@ -91,6 +91,18 @@
 --			+ Value 10 indidates both 2 and 8.
 --			+ By default the value 1 is used.
 --		+ In the WITH clause, use the ColPattern parameter to flexibly specify the type of mapping; this will overwrites or enhances the default mapping indicated by the flags
+-- 10. XML DML
+--	+ Is an extension of the XQuery language includes the following 3 case-sensitive keywords
+--	+ insert: used to add one or more constructed nodes into an identified node.
+--		+ The nodes can be inserted as child nodes or siblings based on the specified arguments ({as first | as last} into | after | before)
+--		+ The action support insertion of one or multiple element nodes, attributes, comment node, processing instruction, CDATA section, and text node.
+--	+ delete: used to delete a specified node and its child nodes, or a specified attribute; expressed by the argument accept XQuery expression
+--	+ replace value of: used to update the value of an identified node with a new value, the type of the node must be a simple type content, a text node, or an attribute node.
+-- 11. XML data type methods
+--	+ The built-in methods of XML data type to query an XML instance.
+--	+ 
+-- 12. XQuery expression and XPath expression
+
 
 
 
@@ -344,6 +356,21 @@ SELECT
     XML_SCHEMA_NAMESPACE(N'dbo', N'XSD2', 'schema2b')
 GO
 
+-- Get XSD of XML columns of table
+SELECT	
+	tb.name AS [Table name],
+	c.name AS [Column name],
+	ISNULL(xsc.name, '') AS [XSD collection name],
+	ISNULL(xsn.name, '') AS [XSD namespace],
+	XML_SCHEMA_NAMESPACE(SCHEMA_NAME(tb.schema_id), xsc.name, xsn.name) AS [XSD]
+FROM sys.columns c
+INNER JOIN sys.tables tb ON tb.object_id = c.object_id
+INNER JOIN sys.types t ON t.system_type_id = c.system_type_id AND t.user_type_id = c.user_type_id AND t.name = 'xml'
+LEFT JOIN sys.xml_schema_collections xsc ON xsc.xml_collection_id = c.xml_collection_id
+LEFT JOIN sys.xml_schema_namespaces xsn ON xsn.xml_collection_id = xsc.xml_collection_id
+WHERE tb.object_id = OBJECT_ID('Production.ProductModel', 'U');
+GO
+
 
 
 
@@ -531,7 +558,7 @@ GO
 
 
 
--- XML Parse using OPENXML
+-- OPENXML
 CREATE OR ALTER PROCEDURE [dbo].[OPENXMLDemo1]
 AS
 BEGIN
@@ -675,12 +702,14 @@ BEGIN
 	DECLARE @myDoc XML;
 	SET @myDoc = 
 		N'<Root>
-			<ProductDescription ProductID="1" ProductName="Road Bile">
+			<ProductDescription ProductID="1" ProductName="Road Bike">
 				<Features>
 				</Features>
 			</ProductDescription>
 		</Root>';
 	
+
+	-- INSERT
 	-- Insert first feature child
 	SET @myDoc.modify(
 		'insert <Maintenance>3 year parts and labor extended maintenance is available</Maintenance>
@@ -722,7 +751,8 @@ BEGIN
 	SET @myDoc.modify(
 		'insert (
 			attribute Price {sql:variable("@price")},
-			attribute Quantity {"5"}
+			attribute Quantity {"5"},
+			attribute State {"0"}
 		)
 		into (/Root/ProductDescription[@ProductID=1])[1]'
 	);
@@ -739,9 +769,164 @@ BEGIN
 		before (/Root)[1]'
 	);
 
+	-- Insert data using CDATA section
+	--SET @myDoc.modify(
+	--	'insert <![CDATA[ <notxml> as text </notxml> or cdata ]]>
+	--	after (/Root/ProductDescription/Features)[1]'
+	--);
+
+	-- Insert text node with line breaker '&#x0A;'
+	SET @myDoc.modify(
+		'insert text{"&#x0A;Product Catalog Description&#x0A;"}
+		as last into (/Root)[1]'
+	);
+
+	-- Insert data based on an if condition statement
+	SET @myDoc.modify(
+		'insert
+		if (/Root/ProductDescription[@ProductID=1])
+		then element ProductCategory { "Bike" }
+		else ()
+		as first into (/Root/ProductDescription[@ProductID=1])[1]'
+	);
+
+	SELECT @myDoc;
+
+
+	-- DELETE
+	-- Delete an attribute
+	SET @myDoc.modify(
+		'delete /Root/ProductDescription/@Quantity'
+	);
+
+	-- Delete an element ProductCategory
+	SET @myDoc.modify(
+		'delete /Root/ProductDescription/ProductCategory[1]'
+	);
+
+	-- Delete the second Features element
+	SET @myDoc.modify(
+		'delete /Root/ProductDescription/Features/*[2]'
+	);
+
+	-- Delete text node
+	SET @myDoc.modify(
+		'delete /Root/text()'
+	);
+
+	-- Delete all processing instructions
+	SET @myDoc.modify(
+		'delete //processing-instruction()'
+	)
+
+	SELECT @myDoc;
+
+
+	-- UPDATE
+	-- Update text in the warranty feature
+	SET @myDoc.modify(
+		'replace value of (/Root/ProductDescription/Features/Warranty[1]/text())[1]
+		with "2 year parts and labor"'
+	);
+
+	-- Update attribute value
+	SET @myDoc.modify(
+		'replace value of (/Root/ProductDescription/@Price)[1]
+		with "100.0"'
+	);
+
+	-- Update based on if condition statement
+	SET @myDoc.modify(
+		'replace value of (/Root[1]/ProductDescription[1]/@State)[1]
+		with (
+			if (count(/Root[1]/ProductDescription[1]/Features/*) > 3) then 
+				"1"
+			else 
+				"2"
+		)'
+	);
+
 	SELECT @myDoc;
 END
 GO
 
 EXEC [dbo].[XMLDMLDemo];
+GO
+
+
+
+
+-- XML data type methods (with XQuery expression and XQuery functions)
+WITH XMLNAMESPACES (
+	'http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelDescription' AS PD,
+	'http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelWarrAndMain' AS wm,
+	'http://www.w3.org/1999/xhtml' AS html
+)
+SELECT
+	ProductModelID,
+	CatalogDescription AS [origin XML],
+	CatalogDescription.query(
+		'/PD:ProductDescription/PD:Summary'
+	) AS [query node],
+	CatalogDescription.query(
+		'<Product ProductModelID="{/PD:ProductDescription[1]/@ProductModelID}" />
+	') AS [query construct XML],
+	CatalogDescription.value(
+		'(/PD:ProductDescription/@ProductModelID)[1]', 'Int'
+	) AS [value ProductModelID],
+	CatalogDescription.value(
+		'(/PD:ProductDescription/@ProductModelName)[1]', 'Varchar(50)'
+	) AS [value ProductModelName],
+	CatalogDescription.value(
+		'(/PD:ProductDescription/PD:Summary/html:p/text())[1]', 'Varchar(MAX)'
+	) AS [value Summary>p content]
+FROM Production.ProductModel
+WHERE CatalogDescription.exist('/PD:ProductDescription/PD:Features/wm:Warranty') = 1
+	AND CatalogDescription.exist('/PD:ProductDescription[xs:integer(@ProductModelID)=sql:column("ProductModelID")]') = 1;
+GO
+
+DECLARE @x XML = '<Somedate date="2002-01-01Z">2002-01-01Z</Somedate>';
+DECLARE @d Nvarchar(12) = '2002-01-01Z';
+SELECT @x.exist('/Somedate[(@date cast as xs:date?) eq xs:date("2002-01-01Z")]') AS [exist eq],
+	@x.exist('/Somedate[(text()[1] cast as xs:date ?) = xs:date(sql:variable("@d"))]') AS [exist =],
+	@x.exist('/Somedate[not(OtherElements)]') AS [exist not]
+GO
+
+DECLARE @x XML = 
+	N'<Root1>  
+		<Root2>
+			<Location LocationID="10">  
+				<step>Step101</step>  
+				<step>Step102</step>  
+			</Location>  
+			<Location LocationID="20">  
+				<step>Step201</step>
+				<step>Step202</step>
+			</Location>  
+			<Location LocationID="30">  
+				<step>Step301</step>
+				<step>Step302</step>
+			</Location>  
+		</Root2>
+	</Root1>';
+SELECT
+	@x AS [original XML],
+	T.c.query('/') AS [nodes - logical copy of XML],
+	T.c.query('..') AS [nodes location context - direct parent accessor],
+	T.c.query('.') AS [nodes location context],
+	T.c.query('*') AS [nodes logical context - all child elements]
+FROM @x.nodes('/Root1/Root2/Location') AS T(c)
+GO
+
+WITH XMLNAMESPACES (
+	'http://schemas.microsoft.com/sqlserver/2004/07/adventure-works/ProductModelManuInstructions' AS MI
+)
+SELECT 
+	ProductModelID,
+	T1.Locations.value('./@LocationID', 'Int') AS LocationID,
+	T2.steps.query('.') AS Step
+FROM Production.ProductModel
+CROSS APPLY Instructions.nodes('/MI:root/MI:Location') AS T1(Locations)
+CROSS APPLY T1.Locations.nodes('./MI:step') AS T2(steps)
+WHERE ProductModelID = 7
 GO
