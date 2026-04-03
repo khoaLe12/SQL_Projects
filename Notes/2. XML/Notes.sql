@@ -1,118 +1,111 @@
 ﻿
 
 -- XML DATA
--- 1. SQL Server provides a powerful platform to work with XML
---	+ XML data can be stored natively in an xml data type column
---	+ XML data can be typed according to a collection of XML schemas, or left untyped.
---	+ Support querying XML data through XQuery language which its expression is based on the existsing XPath query language.
---	+ Enhancements to OPENROWSET to allow bulk loading of XML data.
---	+ The ability to parse between relational data and XML data
---	+ XML columns can be compressed (starting with SQL Server 2022) and indexed.
---	+ Preserve the document order and document structure, elements and attributes values, namespace prefixes, and XML declaration.
---	+ The structure is effecient for fine-grained query like extracting some of the sections within XML document using predicate evaluation.
---	+ Effectively modifying/inserting new sections without replacing whole document, and the oprerations are performed in a transacted way.
---	+ Guarantee the XML data format by validate input with XML schemas.
---	+ Indexes on XML data type increases the query processing.
---	+ More flexible than relational structure if the structure is frequently changed.
--- 2. XML storage options:
---	+ Natively store xml data type, improves parsing speed significantly through PSVI
---	+ Using an annotated schema (AXSD) to decompose XML into columns, create a copy of XML data (called XML view) is stored at the relational level.
---	+ Data is stored as large object storage, [n]varchar(max) and varbinary(max) which create an identical copy of data. 
--- 3. Typed XML instance has a collection of XML schema associated with it, provide more benefits compared to untyped XML.
---	+ The XML schema collection can be associated with variables, parameters, or columns of the xml data type.
---	+ The ability to define validation constraints when creating or modifying XML instance.
---	+ Store information of data types of attributes and elements in an instance, make it more adventages to query the know type of data with more precise operational semantics.
---	+ Allow declaring an XML instance with a specific facet are DOCUMENT and CONTENT, CONTENT is the default option.
---	+ Document XML restricts the xml instance to have exactly one top-level element.
---	+ Content XML can contain zero or many top-level elements or even text nodes.
--- 4. SQL Server stores and return XML data in Unicode (UTF-16) encoding
---	+ If a source code page does not specify the encoding in the string, an its encoding isn't Unicode, the parsing could cause error
---	+ To explicitly specify encoding for a source code page, prepending XML declaration with encoding to the XML document.
--- 5. XML Index:
---	+ Indexing XML data will affect all tags, values and paths over the XML instance.
---	+ Improve query performance but trade off with index maintenance cost.
---	+ XML indexes are defined as categories: Primary XML index and Secondary XML index
---	+ The primary index is a shredded representation of XML instance, it create a row for each node in XML object
---		+ Rows store all informations of a node: tag/element/attribute name, node type and its value, document order, path from node to the root
---		+ This stored information help query engine to quickly locate the specific node through its name and path.
---		+ Persist the representation of XML, avoid shredding XML binary large objects at run time.
---	+ The seondary indexes store additional data of XML, built from primary XML index, they are divided into three main types:
---		+ PATH secondary XML index: significantly speed up query that searching for paths
---		+ VALUE secondary XML index: benefits from querying specific node value without knowing the element and attribute names of the node, and the path is not fully specified or it includes a wildcard.
---		+ PROPERTY secondary XML index: best use in scenario of querying one or more values of object using value() method in the SELECT statement.
---	+ The Selective XML indexes:
---		+ 
--- 6. XML compression
---	+ Compress the XML data to a compressed format, but doesn't change XML data syntax and semantics.
---	+ XML data is compressed with the Xpress Compression Algorithm.
---	+ XML indexes are compressed using data compression.
--- 7. XML Schemas (XSD)
---	+ XML Schema collection contains a list of XML schemas, used to validate XML instances.
---	+ XML schema collection is a metadata of an instance, define all the data type information for the instance data.
---	+ XML schema can contains a various components like ELEMENT, ATTRIBUTE, SIMPLE TYPE, COMPLEX TYPE, ATTRIBUTEGROUP, MODELGROUP
---	+ SQL Server stores the defined components instead of XML it self.
---  +
--- 8. FOR XML
---  + SQL Server provides the FOR XML clause to parse the rowset results into XML document.
---  + The shape of the resulting XML can be explicitly specified with RAW, AUTO, EXPLICIT, or PATH modes.
---      + Use RAW[('ElementName')] mode to generates a single element per row, or construct XML hierarchy be writing nested FOR XML queries; by default the element tag use the identifier <row>.
---      + Use AUTO mode to generate nesting XML, the shape is based on the order of tables identified by the columns specified in the SELECT clause.
---      + Use EXPLICIT mode to mix attributes and elements, this mode allows to create more complex shape of XML (wrapper, nested properties, space-seperated values, mixed contents), but often result in cumbersome queries.
---      + Use PATH[('ElementName')] mode with the nested FOR XML query capability as a simpler alternative to the EXPLICIT mode; by default the mode generate a <row> element wrapper for each row, no wrapper element is generated if empty string is used.
---  + To defined the format of XML data, SQL Server support the following directives/options:
---      + MLDATA specifies that an inline XML-Data Reduced (XDR) schema should be returned.
---      + XMLSCHEMA is used to request an inline W3C XML Schema (XSD) built from result.
---      + ELEMENTS to format columns as subelements, this option is supported in RAW, AUTO, and PATH modes only.
---      + TYPE specify that the query returns the results as the xml type; if not specified, the XML data returned to client as a string type.
---      + ROOT[('RootName')] specify that a single, top-level element is added to the result, the default value is <root>.
---      + BINARY BASE64 tell the returned binary data is represented in base64-encoded format.
---      + XSINIL specifies that an element that has an xsi:nil attribute set to TRUE be created for NULL column values; this option can only be used with ELEMENTS directive.
---      + ABSENT is used with ELEMENTS directive by default, it specifies that no elements are created for NULL values.
---  + Directives are seperated by comma(,); each option must be used with directive
--- 9. OPENXML
---	+ Is a technique to parse in-memory XML documents into rowsets, similar to a table or a view.
---	+ It creates an in-memory document object model(DOM) tree representation of the XML document.
---	+ Used as a keyword that accepts some parameters and options:
---		+ An XML document handle (idoc): is a DOM tree representation of an XML document, execute procedure sp_xml_preparedocument to prepare the document, use procedure sp_xml_removedocument to free the memory
---		+ AN XPath expression: to identify the nodes to be mapped to row (rowpattern).
---		+ A description of the rowset to be generated.
---		+ Mapping between the rowset columns and the XML nodes.
---	+ There are some options to specify a rowset description/schema:
---		+ Use the edge table format: represents the fine-grained XML document structure, includes the element and attribute names, the document hierarchy, the namesaces, and the processing instructions.
---		+ Use the WITH clause to specify an existing table: instruct OPENXML to refers to the schema of an existing table to generate the rowset.
---		+ Use the WITH clasue to specify a schema: manually specify a complete schema, by defining column names, their data types, their mapping to the XML document with/without column pattern (ColPattern)
---	+ Map between the rowset columns and the XML nodes
---		+ In the OPENXML statement, use the flags parameter to explicitly specify the type of mapping:
---			+ Value 1 for attribute-centric mapping.
---			+ Value 2 for element-centric mapping.
---			+ Value 3 indicates both 1 and 2.
---			+ Value 8 means only unconsumed XML data should be added to the OverFlow column defined in the WITH clause.
---			+ Value 9 indicates both 1 and 8.
---			+ Value 10 indidates both 2 and 8.
---			+ By default the value 1 is used.
---		+ In the WITH clause, use the ColPattern parameter to flexibly specify the type of mapping; this will overwrites or enhances the default mapping indicated by the flags
--- 10. XML DML
---	+ Is an extension of the XQuery language includes the following 3 case-sensitive keywords
---	+ insert: used to add one or more constructed nodes into an identified node.
---		+ The nodes can be inserted as child nodes or siblings based on the specified arguments ({as first | as last} into | after | before)
---		+ The action support insertion of one or multiple element nodes, attributes, comment node, processing instruction, CDATA section, and text node.
---	+ delete: used to delete a specified node and its child nodes, or a specified attribute; expressed by the argument accept XQuery expression
---	+ replace value of: used to update the value of an identified node with a new value, the type of the node must be a simple type content, a text node, or an attribute node.
--- 11. XML data type methods
---	+ The built-in methods of XML data type to query an XML instance through XQuery expression.
---	+ query(XQuery): used to query for XML nodes, such as elements and attributes; the method can be used to construct XML by using XML Construction (XML)
---	+ value(XQuery, SQLType): performs an XQuery against XML and returns a value of SQL type; the XQuery must return at most one value (the path expression must returns a singleton).
---	+ exist(XQuery): returns 1 if the query returns a nonempty result, 0 if it returns an empty result, and NULL if the XML instance is null
---	+ modify(XML_DML): used with SET clause of an UPDATE statement to modify the contents of an XML document.
---	+ nodes(XQuery) AS Table(Column): used to shred document into relational data; the result of method is a rowsets, that each rowset contains logical copy of the original XML instance, and the context node identified by the XQuery.
---	+ The nodes method can not be used in SELECT statement, the other approach is to use with APPLY clause.
--- 12. XQuery expression and XPath expression
---	+ XQuery is a query expression against the XML document, can be used to query or contruct a new XML instance.
---	+ The XQuery is based on the existing XPath query language, with support added for better iteration, better storing results, and the ability to construct the necessary XML.
---	+ The XQuery expression also provides methods to process and transform the data, include 2 special functions sql:column() and sql:variable() to binding relational data/sql variable inside XML.
---	+ An XQuery query is made up of a prolog and a body
---		+ The prolog is a series of declarations and definitions to create the required environment for query processing like namespace declarations
---		+ The body is made up of a sequence of expressions used to query against the document.
+-- 1. Overview:
+--	+ SQL Server provides native support for XML data.
+--	+ XML can be stored in an xml data type column or variable.
+--	+ XML instances can be typed (validated against an XML schema collection) or untyped.
+--	+ Querying is supported through XQuery, based on XPath.
+--	+ Supports bulk loading via OPENROWSET.
+--	+ Enables conversion between relational and XML data.
+--	+ XML columns can be compressed (SQL Server 2022+) and indexed.
+--	+ Preserves document order, structure, namespace, and declarations.
+--	+ Efficient for fine-grained queries (predicate evaluation).
+--	+ Supports transactional modifications (insert/update/delete sections) of XML data.
+--	+ Validation against XML schemas guarantees format correctness.
+--	+ More flexible than relational structures when schemas change frequently.
+-- 2. Storage options:
+--	+ Native xml data type (fast parsing via PSVI).
+--	+ Annotated schema (AXSD) → decomposes XML into relational columns (XML view).
+--	+ Large object storage (nvarchar(max), varbinary(max)) → stores identical copy of XML.
+-- 3. Typed XML:
+--	+ Associated with an XML schema collection.
+--	+ Schema can be bound to variables, parameters, or columns.
+--	+ Provides validation constraints.
+--	+ Stores type information for attributes/elements → improves query percision.
+--	+ Facets: DOCUMENT (exactly one top-level element) vs CONTENT (zero/many top-level elements or text nodes).
+-- 4. Encoding:
+--	+ XML data stored/returned in UTF-16.
+--	+ If source encoding is not Unicode and not declared, parsing errors may occur.
+--	+ Explicit encoding can be declared in the XML header.
+-- 5. XML indexes:
+--	+ Improve query performance but add maintenance overhead.
+--	+ Primary XML index: shredded representation (row per node).
+--		- Stores node name, type, value, document order, path.
+--		- Avoid runtime shredding.
+--	+ Secondary XML indexes (built on primary):
+--		- PATH index → speeds up path-based queries.
+--		- VALUE index → speeds up value-based queries (full path is not specified or using wildcards, query with unkonw element/attribute names).
+--		- PROPERTY index → speeds up queries using value() method in the SELECT statement.
+--	+ Selective XML indexes → index only chosen paths/nodes for efficiency.
+-- 6. XML Compression:
+--	+ Compress XML data using Xpress algorithm.
+--	+ XML indexes can also use data compression.
+-- 7. XML Schemas (XSD):
+--	+ XML schema collections hold multiple schemas for validation.
+--	+ Define metadata and data type information for XML instances.
+--	+ Components: ELEMENT, ATTRIBUTE, SIMPLE TYPE, COMPLEX TYPE, ATTRIBUTEGROUP, MODELGROUP.
+--	+ SQL Server stores schema components, not the XML itself.
+-- 8. FOR XML:
+--	+ Converts rowset results into XML.
+--	+ Modes:
+--		- RAW(<element name>) → one element per row (<row> default).
+--		- AUTO → nested XML based on table order.
+--		- EXPLICIT → complex shapes (attributes + elements).
+--		- PATH → simpler alternative to EXPLICIT, supports nesting.
+--	+ Directives:
+--		- XMLDATA → inline XDR schema.
+--		- XMLSCHEMA → inline XSD schema.
+--		- ELEMENTS → format columns as subelements.
+--		- TYPE → return xml type instead of string.
+--		- ROOT(<root name>) → add a top-level element (<root> default).
+--		- BINARY BASE64 → encode binary data.
+--		- XSINIL → create xsi:nill for NULL values.
+--		- ABSENT → omit NULL values (default).
+-- 9. OPENXML:
+--	+ Parses in-memory XML into rowsets.
+--	+ Uses sp_xml_preparedocument / sp_xml_removedocument for handling DOM tree of document.
+--	+ Parameters:
+--		- idoc (document handle).
+--		- XPath expression (rowpattern).
+--		- Rowset schema (WITH clause).
+--	+ Mapping options:
+--		- Flags: 1 (attribute-centric), 2 (element-centric), 3 (both), 8 (overflow), etc.
+--		- ColPattern in WITH clause for flexible mapping.
+-- 10. XML DML:
+--	+ Extensions to XQuery for modifying XML.
+--	Keywords:
+--		- insert → add nodes (elements, attributes, comments, text, etc.).
+--		- delete → remove nodes/attributes.
+--		- replace value of → update node/attribute values (simple types only).
+-- 11. XML Data Type Methods
+--	+ SQL Server provides built-in methods on the xml data type to query and manipulate XML instances using XQuery.
+--	Methods:
+--	+ query(XQuery) → returns XML nodes (elements/attributes). Can also construct new XML fragments.
+--	+ value(XQuery, SQLType) → extracts a scalar value from XML and returns it as a SQL type.
+--		- Must return a singleton (one value only).
+--	+ exist(XQuery) → returns:
+--		- 1 if the query returns a non-empty result,
+--		- 0 if empty,
+--		- NULL if the XML instance is NULL.
+--	+ modify(XML DML) → used in UPDATE statements to modify XML content (insert, delete, replace).
+--	+ nodes(XQuery) AS Table(Column) → shreds XML into relational rowsets.
+--		- Each row contains a logical copy of the XML instance with context node identified by XQuery.
+--		- Typically used with CROSS APPLY, not standalone SELECT.
+-- 12. XQuery and XPath
+--	+ XQuery is the language used to query and construct XML in SQL Server.
+--	+ Based on XPath, but extended with:
+--		- Iteration and looping constructs.
+--		- Ability to construct new XML instances.
+--		- Functions for transformation and binding relational data.
+--	+ Special functions:
+--		- sql:column() → bind relational column values into XML.
+--		- sql:variable() → bind SQL variables into XML.
+--	+ Structure:
+--		- Prolog → declaration environment for query (e.g., namespaces)/
+--		- Body → sequence of expressions to query or transform XML.
+
+
 
 
 -- PRACTICE
