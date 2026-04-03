@@ -99,11 +99,20 @@
 --	+ delete: used to delete a specified node and its child nodes, or a specified attribute; expressed by the argument accept XQuery expression
 --	+ replace value of: used to update the value of an identified node with a new value, the type of the node must be a simple type content, a text node, or an attribute node.
 -- 11. XML data type methods
---	+ The built-in methods of XML data type to query an XML instance.
---	+ 
+--	+ The built-in methods of XML data type to query an XML instance through XQuery expression.
+--	+ query(XQuery): used to query for XML nodes, such as elements and attributes; the method can be used to construct XML by using XML Construction (XML)
+--	+ value(XQuery, SQLType): performs an XQuery against XML and returns a value of SQL type; the XQuery must return at most one value (the path expression must returns a singleton).
+--	+ exist(XQuery): returns 1 if the query returns a nonempty result, 0 if it returns an empty result, and NULL if the XML instance is null
+--	+ modify(XML_DML): used with SET clause of an UPDATE statement to modify the contents of an XML document.
+--	+ nodes(XQuery) AS Table(Column): used to shred document into relational data; the result of method is a rowsets, that each rowset contains logical copy of the original XML instance, and the context node identified by the XQuery.
+--	+ The nodes method can not be used in SELECT statement, the other approach is to use with APPLY clause.
 -- 12. XQuery expression and XPath expression
-
-
+--	+ XQuery is a query expression against the XML document, can be used to query or contruct a new XML instance.
+--	+ The XQuery is based on the existing XPath query language, with support added for better iteration, better storing results, and the ability to construct the necessary XML.
+--	+ The XQuery expression also provides methods to process and transform the data, include 2 special functions sql:column() and sql:variable() to binding relational data/sql variable inside XML.
+--	+ An XQuery query is made up of a prolog and a body
+--		+ The prolog is a series of declarations and definitions to create the required environment for query processing like namespace declarations
+--		+ The body is made up of a sequence of expressions used to query against the document.
 
 
 -- PRACTICE
