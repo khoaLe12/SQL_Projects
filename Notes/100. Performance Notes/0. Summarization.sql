@@ -9,6 +9,15 @@
 --	+ Periodically reorganize/rebuild indexes
 -- 2. Statistics
 --	+ Check if statistic is up to date
+-- 3. Check query plan
+--	+ If Hash bailout (Grace hash join or Recursive hash join) occurs -> update statistics on the columns that are being joined.
+
+
+
+
+-- If a SELECT statement invokes a scalar function
+-- 1. Enable Scalar UDF inlining using option WITH INLINE = ON
+--	+ This prevents the context switching between caller and invoked function
 
 
 
@@ -16,6 +25,7 @@
 -- 1. To seperate old data and new data
 --	+ Old data is rarely queried/modified
 --	+ New data is queried all the time -> focus on improving query on new data
+
 
 
 -- Apply Sharding and Replication
