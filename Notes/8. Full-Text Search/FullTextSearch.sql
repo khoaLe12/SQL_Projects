@@ -1,59 +1,60 @@
-
+﻿
 -- Full-Text Search
--- 1. The feature that support for full-text queries agains character-based data.
--- 2. Full-Text Search is an optional component of SQL Server Database Engine, its only available only if the option is enabled.
--- 3. To add feature to an existing instance, run SQL Server Installation Center -> Installation -> add features to an existing installation.
--- 4. The full-text index support all character based data type, include binary data type that represent the text file.
--- 5. Full-text queries perform linguistic searches against text data based on the rules of a particular language.
--- 6. A table can be full-text indexed only if that table has a unique, single-column, non-nullable index; choose the smallest index (A 4-byte, integer-based index is optimal) is required since it reduces the resources required by search service.
--- 7. By default, the system stoplist are applied to every full-text index, it allows to create a custom stoplist and associate with specified full-text index.
--- 8. Updating a full-text index immediately after each change could be resource-intensive, consider scheduling manual change tracking updates.
--- 9. To reduce the number of full-text index fragments, do rebuild or reorganize the index.
--- 10. The query support searching with the following conditions (know as term):
---	+ simple: one or more specific words or phrases.
---	+ prefix: A word or a phrase where the words in text begin with
---		- if a phrase prefix is used, it will produce derivative words or inflected forms of each tokenized within phrase.
---	+ generation: Inflectional forms of a specific word.
---	+ proximity: A word or phrase close to another word or phrase
---	+ thesaurus: Synonymous forms of a specific word.
---	+ weighted: Words or phrases using weighted values.
--- 11. Comparing with LIKE search, Full-Text Search can work on both character patterns and formtted binary data, and also much faster.
+-- 1. Full-Text Search enables full-text queries against character-based data.
+-- 2. It is an optional component of the SQL Server Database Engine, available only if enabled.
+-- 3. To add the feature to an existing instance: SQL Server Installation Center → Add features to an existing installation.
+-- 4. Full-text indexes support all character-based data types, including binary types that represent text files.
+-- 5. Full-text queries perform linguistic searches against text data, following the rules of a specified language.
+-- 6. A table can be full-text indexed only if it has a unique, single-column, non-nullable index.
+--	+ Choosing a small index (e.g., 4-byte integer) reduces resource usage.
+-- 7. By default, the system stoplist is applied to every full-text index.
+--	+ Custom stoplists can be created and associated with specific indexes.
+-- 8. Updating a full-text index immediately after each change can be resource-intensive.
+--	+ Consider manual or scheduled change tracking updates.
+-- 9. To reduce index fragmentation, rebuild or reorganize the full-text index.
+-- 10. Compared with LIKE, Full-Text Search is faster and works on both character patterns and formatted binary data.
+-- 11. Full-text queries support the following term types:
+--	+ Simple: specific words or phrases.
+--	+ Prefix: words or phrases where tokens begin with the specified prefix.
+--		- Phrase prefixes can also match derivative or inflectional forms of each token.
+--	+ Generation: inflectional forms of a word (FORMSOF(INFLECTIONAL)).
+--	+ Proximity: words or phrases near each other (NEAR).
+--	+ Thesaurus: synoyms defined in thesaurus files.
+--	+ Weighted: terms with assigned relevance weights.
+--	+ Queries can combine multiple terms, increasing complexity and resource usage.
 -- 12. Full-Text Search architecture:
---	+ The SQL Server process (sqlserver.exe)
---		- Responsible for managing and processing all 
---		- SQL Server query processor: responsible for processing all received queries that compile and execute them; if the query includes full-text search query, it will cooperate with Full-Text Engine.
---		- Full-Text Engine:  compiles and executes full-text queries, may receive input from thesaurus and stoplist.
---		- Thesaurus files: contains synonyms of search term.
---		- Stoplist objects: contains a list of common words that aren't useful for the search.
---		- Full-text gatherer: works with the full-text crawl threads, responsible for scheduling and driving the population of full-text indexes.
---		- Index writer (indexer): build the structure that is used to store the index tokens.
---		- Filter daemon manager: responsible for monitoring the status of the Full-text Engine filter daemon host
---	+ The filter daemon host process (fdhost.exe)
---		- Running seperately under the FDHOST launcher service and started by the Full-Text Engine, the host is available only when the service account of this service is enable.
---		- Protocol handler: responsible for gathering data from memory, pass it to filter daemon host for further processing.
---		- Filters: filtering document data represented in binary format, extracts text and/or removes embedded formatting of documents in some extensions such as .doc, .xls, .xml., and pasrse it into text data.
---		- Word breakers and stemmers: constructs words from textual data with a language-specific stemmer component.
--- 13. Full-Text indexing process:
---	+ Firstly Full-Text Engine pushes large batches of data into memory and start the filter daemon host.
---	+ The host filters and word-breaks the data and converts it into word lists, each word also know as token, or keyword.
---	+ Optionaly perform extra processing to remove stopwords, and to normalize tokens.
---	+ For each text is processed, its tokens are stored in the full-text index or an index fragment.
---	+ When a population is complete, trigger a process that merges all index fragments together into one master full-text index.
+--	+ SQL Server process (sqlserver.exe):
+--		- Query processor: compiles and executes queries, cooperates with Full-Text Engine for full-text queries.
+--		- Full-Text Engine: compiles and executes full-text queries, applies thesaurus and stoplist rules.
+--		- Thesaurus files: contain synonyms of search terms.
+--		- Stoplist objects: contain common words excluded from searches.
+--		- Full-text gatherer: schedules and drives population of full-text indexes.
+--		- Index writer (indexer): build structures to store index tokens.
+--		- Filter daemon manager: monitors the filter daemon host.
+--	+ Filter daemon host process (fdhost.exe)
+--		- Runs seperately under FDHOST launcher service, started by Full-Text Engine.
+--		- Protocol handler: gathers data and passes it to the host.
+--		- Filters: extract text from binary formats (.doc, .xls, .xml, etc.), remove formatting.
+--		- Word breakers and stemmers: tokenize text and apply language-specific stemming.
+--	13. Full-Text indexing process:
+--	+ Full-Text Engine pushes batches of data into memory and starts the filter daemon host.
+--	+ The host filters and word-breaks the data into tokens (keywords).
+--	+ Optional processing removes stopwords and normalizes tokens.
+--	+ Tokens are stored in full-text index fragments.
+--	+ When population completes, fragments are merged into a master full-text index.
 -- 14. Full-Text querying process:
---	+ If a query include full-text query, its full-text portions are passed to the Full-Text Engine.
---	+ The Full-Text Engine performs word breaking and, optionally, thesaurus expansions, stemming, and stopword processing.
---	+ Convert the full-text query into SQL operators, primarily as stemming table-valued functions (STVFs).
---	+ During query execution, these STVFs search full-text indexes to find matching results.
--- 15. Full-text index structure:
---	+ Full-Text indexes can be stored in many fragments; only one master fragment persisted in a database is the optimal case for full-text search.
---	+ A fragment is an internal table that store inverted index data, each fragment has some infomative valuable columns:
---		- Keyword: contains a representation of a single token extracted at indexing time.
---		- ColId: id that corresponds to a particular column that is full-text indexed.
---		- DocId: the id of text data that keyword belong to.
---		- Occurence: the position number of keyword within the text data specified by DocId.
---	+ Each text data is associated with a unique documentId which reference to full-text indexed column data of a table's row.
-
-
+--	+ Full-text portions of queries are passed to the Full-Text Engine.
+--	+ Engine performs word breaking, thesaurus expansion, stemming, and stopword processing.
+--	+ Queries are converted into SQL operators, primarily stemming table-valued functions (STVFs).
+--	+ STVFs search full-text indexes for matches during execution.
+-- 15. Full-Text index structure:
+--	+ Full-text indexes may consist of multiple fragments; ideally, one master fragment is persisted.
+--	+ A fragment is an internal table storing inverted index data, with columns:
+--		- Keyword: token extracted at indexing time.
+--		- ColId: column ID for the indexed column.
+--		- DocId: document ID referencing the row in the table.
+--		- Occurrence: position of the keyword within the document.
+--	+ Each row of indexed text data is associated with a unique DocId.
 
 
 -- PRACTICE
@@ -175,6 +176,18 @@ INNER JOIN CONTAINSTABLE (
 ) AS KEY_TBL ON KEY_TBL.[KEY] = FT_TBL.ProductDescriptionID
 WHERE KEY_TBL.RANK > 2
 ORDER BY KEY_TBL.RANK DESC;
+GO
+
+
+-- Search for product description that contain the word "cats", the phrase "hunting mice", and any word beginning with "dog" (such as "dog" or "dogs"), 
+--	with all of them appearing in order and within three intervening non-search terms.
+-- Ex: Cats enjoy hunting mice``, but avoid dogs``. 
+--	   Cats enjoy hunting mice``, but avoid dog``.
+SELECT 
+	ProductDescriptionID,
+	Description
+FROM Production.ProductDescription
+WHERE CONTAINS(Description, 'NEAR((cats, "hunting mice", "dog*"), 3, TRUE)');
 GO
 
 
