@@ -1,0 +1,67 @@
+
+-- INDEX ARCHITECTURE AND DESIGN
+-- 1. Index design is one of the most important strategies to improve query performance
+--	+ A lack of indexes, over-indexing, or poorly designed indexes are top source of database performance problems.
+--	+ The design of the right indexes is a complex balancing act between query speed, index update cost, and storage cost.
+-- 2. There are many types of index with their storage format, each one is suitable for specific scenarios
+--	+ Choosing index go along with a very carefull analyzing the characteristics of the database, applicationa and most frequently used queries.
+-- 3. Index design tasks:
+--	+ Understand the characteristics of the database and application:
+--		- In an OLTP database with frequent data modification with high throughput, a few narrow rowstore indexes would be a good initial index design
+--		- For an analytics of OLAP database, using clustered columnstore indexes would be especially appropriate.
+--	+ Understand the characteristics of the most frequently used queries:
+--		- Use Query Store to list the most frequent and resource consuming queries.
+--		- Identify the WHERE and JOIN predicates of those queries to determine the set of indexes.
+--	+ Understand the data distribution in the columns:
+--		- For indexed columns with many NULLs or those that have well-defined subsets of data, consider using filtered index.
+--	+ Determine which index options can enhance performance:
+--		- Using row or page data compression to improve I/O speed, but also increase CPU usage.
+--		- Specify lower fill factor value to reduce impact of page split, but increase disk storage.
+-- 4. Index design considerations:
+--	+ Over-indexing an a table affect the performance of INSERT, UPDATE, DELETE, and MERGE statemnets.
+--	+ Write queries that insert or modify as many rows as possible in a single statement can reduce the index maintain cost.
+--	+ Write queries with Search ARGumentable (SARGable) predicate that can use an index.
+--	+ Conering indexes with included columns to avoid lookup/index seek operators; avoid including too many columns since it inflates database storage, I/O, and memory footprint.
+--	+ Keep the length of the index key short, particularly for clustered indexes.
+-- 5. Index placement on filegroups or partitions schemes
+--	+ By default, indexes are stored in the same filegroup as the base table (clustered index or heap).
+--	+ Configure index placement to move table with clustured index and nonclustured indexes to other filegroups
+--		- For frequently accessed tables, create a filegroup with files on faster disks.
+--		- For archive table, create filegroup on slower disk could be acceptable.
+--	+ Partition table and its indexes to span multiple filegroups
+--		- Make large databases more manageable. OLAP systems, for example, can implement partition-aware ETL that greatly simplifies adding and removing data in bulk.
+--		- For long-running analytical queries, the Database Engine can process multiple partitions at the same time and skip (eliminate) partitions that aren't needed by the query.
+-- 6. Clustered index design guidelines
+--	+ The desirable properties of the clustered index are:
+--		- Narrow: An index is narrow if the total length of key column is small, which reduces the storage, I/O, and memory overhead of all indexes on a table.
+--		- Unique: Ensure uniquess avoid the cost of additional 4-byte internal uniqueifier column in all indexes, also helps query optimizer generate more efficient query plan.
+--		- Ever-increasing: Keep new data always added to the last page of the index, this avoid page splits which reduce page density.
+--		- Immutable: The clustered index key is a part of any nonclustered index, so changes on a clustered index will affect to all nonclustered index; it is ideal if clustered index is immutable.
+--		- Has not nullable columns only: If a row has nullable columns, it add NULL block (3-4 bytes of storage) per row in an index.
+--		- Has fixed width columns only: Using variable width data types use an additional 2 bytes per value (e.g., int use fixed 8 bytes, varchar use predefined width).
+--	+ A clustered index key has all of these properties if it is created with a single int/bigint non nullable column, which populated by an IDENTITY clause or a default constraint using a sequence and isn't updated after insertion.
+--	+ Clustered index architecture:
+--		- Clustered indexes have one row in sys.partitions for each partition used by the index, with index_id = 1.
+--		- On each partition, it has a seperate B+ tree structure that contains the data for that specific partition.
+--		- A clustered index structure has one or more allocation units for each partition.
+--			+ At minimum, each partition has one IN_ROW_DATA allocation unit
+--			+ The index has one LOB_DATA allocation unit if it contains large object (LOB) columns such as nvarchar(MAX).
+--			+ It also has one ROW_OVERFLOW_DATA allocation unit if it contains variable length columns that exceed the 8060-byte row size limit.
+-- 7. Nonclustered index design guidelines
+--	+ Nonclustered index should be designed to improve performance of frequently used queries.
+--	+ Nonclustered index architecture:
+--		- It has the same B+ tree structure as clustered indexes.
+--		- The leaf level of a nonclustered index is made up of index pages, they contains key columns, and optionally included columns.
+--		- The row locators in nonclustered index are either a pointer to a row or are a clustered index key for a row.
+--		- Row locators also ensure uniqueness for nonclustered index rows.
+--		- Nonclustered indexes have one row in sys.partitions for each partition used by the index, whith index_id > 1.
+--		- On each partition, it has a seperate B+ tree  structure that contains the data for that specific partition.
+--		- A nonclustered index structure has one or more allocation unit for each partition.
+--			+ At minimum, each partition has one IN_ROW_DATA allocation unit.
+--			+ The index has one LOB_DATA allocation unit if it contains large object columns such as nvarchar(MAX).
+--			+ It also has one ROW_OVERFLOW_DATA allocation unit if it contains variable length columns that exceed the 8060-byte row size limit.
+-- 8. Use included columns in nonclustered indexes
+--	+ Cover the queries with included columns can prevent the Index Seek operators.
+--	+ Determine whether the gains in query performance outweight the decrease in data modification performance and the increase in disk space requirements.
+-- 9. Columnstore index
+
