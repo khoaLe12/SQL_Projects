@@ -1,27 +1,44 @@
-
+﻿
 
 -- JOIN
--- 1. Joins are fundamental database operations that used to combine data from two or more tables into a single result set.
--- 2. SQL Server implements both logical join operators (defined by T-SQL syntax) and physical join operators (the actual algorithm used to execute joins).
--- 3. Logical join operations:
---	+ INNER JOIN: returns the combined data of two tables that both side satisfy the condition.
---	+ LEFT OUTER JOIN: combines rows from two tables while keeping records from left tables, the unmatched records will have null value on the right side.
---	+ RIGHT OUTER JOIN: combines rows from two tables while keeping records from right tables, the unmatched records will have null value on the left side.
---	+ FULL OUTER JOIN: joins two tables base on condition, and returns both macthed and unmatched records from two sides, the unmatched records will have null value on the other side.
---	+ CROSS JOINS: join each record of left table to each record of right table, the result is the multiplication of 2 tables.
---	+ SEMI JOIN: returns a single row in the left table for each match to the right table, no duplications of matched row are allowed (constructed with EXISTS or IN keyword).
---	+ ANTI SEMI JOIN: returns rows from the left table where no matching row exists in the right table (constructed with NOT EXISTS, NOT IN, or LEFT JOIN with NULL matching condition)
--- 4. Physical join operations:
---	+ Nested loops joins
---		- Perform nested loops on two tables to find matches.
---		- The smaller join input is identified as outer input table (top input) and the other as inner input table (bottom input).
---		- For each row in the outer loop, it perform an inner loop to search for the matches of the row.
---		- It is the fastest join operator if the outer input has fewer than 10 rows, and the inner input is indexed on its join columns (called index nested loops join)
---		- If the index is built as part of the query plan, its called a temporary index nested loops join.
---	+ Merge joins
---	+ Hash joins
---	+ Adaptive joins (available on SQL Server 2017+)
-
+-- 1. Definition:
+--	+ Joins are fundamental operations used to combine data from two or more tables into a single result set.
+-- 2. SQL Server implementation:
+--	+ Logical join operators → defined by T-SQL syntax.
+--	+ Physical join operators → actual algorithms chosen by the query optimizer to execute joins.
+-- 3. Logical join types:
+--	+ INNER JOIN → returns rows where both sides satisfy the join condition.
+--	+ LEFT OUTER JOIN → returns all rows from the left table; unmatched rows have NULLs on the right.
+--	+ RIGHT OUTER JOIN → returns all rows from the right table; unmatched rows have NULLs on the left.
+--	+ FULL OUTER JOIN → returns all rows from both tables; unmatched rows have NULLs on the opposite side.
+--	+ CROSS JOIN → Cartesian product; every row from left table joined with every row from right table.
+--	+ SEMI JOIN → returns rows from the left table if a match exists in the right table (no duplicates, no right-side columns). Implemented with EXISTS or IN.
+--	+ ANTI SEMI JOIN → returns rows from the left table where no match exists in the right table. Implemented with NOT EXISTS, NOT IN, or LEFT JOIN + IS NULL.
+-- 4. Physical join algorithms:
+--	+ Nested Loops Join:
+--		- Iterates outer input rows, probing inner input for matches.
+--		- Best when outer input is small (<10 rows) and inner input is indexed on join columns.
+--		- Variants:
+--			* Index Nested Loops → uses existing index.
+--			* Temporary Index Nested Loops → builds index as part of query plan.
+--	+ Merge Join:
+--		- Requires both inputs sorted on join columns.
+--		- Very efficient for large, similarly sized, sorted inputs.
+--		- If input sizes differ greatly, hash join is often faster.
+--		- Handles duplicates by buffering and rewinding rows from the inner input (if both input has duplicate values, this process reduces performance).
+--	+ Hash Join:
+--		- Efficient for large, unsorted, nonindexed inputs.
+--		- Build input (smaller side) → hash table in memory.
+--		- Probe input → scanned row by row, hashed to find matches.
+--		- If memory insufficient:
+--			* Partition phase: both inputs are hashed and split into partition files.
+--			* Build/probe phase: each partition pair is processed separately.
+--			* Reduces onr large join into multiple smaller joins.
+--	+ Adaptive Join (SQL Server 2017+):
+--		- Operator can switch between Nested Loops and Hash Joins during execution.
+--		- Decision based on row count threshold:
+--			* If build input is small → switch to Nested Loops.
+--			* If build input exceeds threshold → continue with Hash Join.
 
 
 

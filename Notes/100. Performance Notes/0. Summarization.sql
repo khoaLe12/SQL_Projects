@@ -109,3 +109,23 @@ GO
 
 
 -- Implement failover mechanism for a database to ensure its availability and reliability
+
+
+-- Troubleshoot the performance of full-text index population
+-- 1. Review the full-text crawl logs; for default instance, logs are located at folder %ProgramFiles%\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\LOG
+--	+ Crawl log naming scheme: SQLFT<DatabaseID\><FullTextCatalogID\>.LOG[<n\>]
+--	+ Ex: SQLFT0000500008.2 -> DBID = 5, catalog ID = 8, 2 craw log files
+-- 2. Check physical memory usage
+--	+ Log shows fdhost.exe is being restarted often or that error code 8007008 is being returned -> one of these processes is running out of memory.
+--	+ Get information about memory buffers used by a full-text crawl
+SELECT 
+	b.pool_id,
+	b.row_count,
+	b.bytes_used,
+	b.percent_used,
+	p.buffer_size,
+	p.min_buffer_limit,
+	p.max_buffer_limit,
+	p.buffer_count
+FROM sys.dm_fts_memory_buffers b
+INNER JOIN sys.dm_fts_memory_pools p ON b.pool_id = p.pool_id
