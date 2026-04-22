@@ -13,9 +13,9 @@
 --	+ ANTI SEMI JOIN: returns rows from the left table where no matching row exists in the right table (constructed with NOT EXISTS, NOT IN, or LEFT JOIN with NULL matching condition)
 -- 4. Physical join operations:
 --	+ Nested loops joins
---		- Perform nested loops on two tables to find matching.
+--		- Perform nested loops on two tables to find matches.
 --		- The smaller join input is identified as outer input table (top input) and the other as inner input table (bottom input).
---		- For each row in the outer loop, if perform an inner loop to search for the matches of the row.
+--		- For each row in the outer loop, it perform an inner loop to search for the matches of the row.
 --		- It is the fastest join operator if the outer input has fewer than 10 rows, and the inner input is indexed on its join columns (called index nested loops join)
 --		- If the index is built as part of the query plan, its called a temporary index nested loops join.
 --	+ Merge joins
