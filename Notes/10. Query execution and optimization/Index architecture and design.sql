@@ -1,67 +1,107 @@
-
+﻿
 -- INDEX ARCHITECTURE AND DESIGN
--- 1. Index design is one of the most important strategies to improve query performance
---	+ A lack of indexes, over-indexing, or poorly designed indexes are top source of database performance problems.
---	+ The design of the right indexes is a complex balancing act between query speed, index update cost, and storage cost.
--- 2. There are many types of index with their storage format, each one is suitable for specific scenarios
---	+ Choosing index go along with a very carefull analyzing the characteristics of the database, applicationa and most frequently used queries.
+-- 1. Index design is one of the most important strategies to improve query performance.
+--	+ A lack of indexes, over-indexing, or poorly designed indexes are common source of performance problems.
+--	+ Designing the right indexes requires balancing query speed, index maintenance cost, and storage overhead.
+-- 2. There are multiple index types with different storage formats, each suitable for specific scenarios.
+--	+ Choosing the right index requires careful analysis of database characteristic, applications, and frequently used queries.
 -- 3. Index design tasks:
---	+ Understand the characteristics of the database and application:
---		- In an OLTP database with frequent data modification with high throughput, a few narrow rowstore indexes would be a good initial index design
---		- For an analytics of OLAP database, using clustered columnstore indexes would be especially appropriate.
---	+ Understand the characteristics of the most frequently used queries:
---		- Use Query Store to list the most frequent and resource consuming queries.
---		- Identify the WHERE and JOIN predicates of those queries to determine the set of indexes.
---	+ Understand the data distribution in the columns:
---		- For indexed columns with many NULLs or those that have well-defined subsets of data, consider using filtered index.
---	+ Determine which index options can enhance performance:
---		- Using row or page data compression to improve I/O speed, but also increase CPU usage.
---		- Specify lower fill factor value to reduce impact of page split, but increase disk storage.
+--	+ Understand database and application characteristics:
+--		- OLTP systems with frequent modifications benefit from a few narrow rowstore indexes.
+--		- OLAP systems benefit from clustered columnstore indexes for analytics.
+--	+ Understand query characteristics:
+--		- Use Query Store to identify frequent and resource-intensive queries.
+--		- Examine WHERE and JOIN predicates to determine useful indexes.
+--	+ Understand data distribution:
+--		- For columns with many NULLs or subsets of data, consider filtered indexes.
+--	+ Evaluate index options:
+--		- Data compression (row/page) improves I/O but increases CPU usage.
+--		- Lower fill factor reduces page splits but increases storage usage.
 -- 4. Index design considerations:
---	+ Over-indexing an a table affect the performance of INSERT, UPDATE, DELETE, and MERGE statemnets.
---	+ Write queries that insert or modify as many rows as possible in a single statement can reduce the index maintain cost.
---	+ Write queries with Search ARGumentable (SARGable) predicate that can use an index.
---	+ Conering indexes with included columns to avoid lookup/index seek operators; avoid including too many columns since it inflates database storage, I/O, and memory footprint.
---	+ Keep the length of the index key short, particularly for clustered indexes.
--- 5. Index placement on filegroups or partitions schemes
---	+ By default, indexes are stored in the same filegroup as the base table (clustered index or heap).
---	+ Configure index placement to move table with clustured index and nonclustured indexes to other filegroups
---		- For frequently accessed tables, create a filegroup with files on faster disks.
---		- For archive table, create filegroup on slower disk could be acceptable.
---	+ Partition table and its indexes to span multiple filegroups
---		- Make large databases more manageable. OLAP systems, for example, can implement partition-aware ETL that greatly simplifies adding and removing data in bulk.
---		- For long-running analytical queries, the Database Engine can process multiple partitions at the same time and skip (eliminate) partitions that aren't needed by the query.
--- 6. Clustered index design guidelines
---	+ The desirable properties of the clustered index are:
---		- Narrow: An index is narrow if the total length of key column is small, which reduces the storage, I/O, and memory overhead of all indexes on a table.
---		- Unique: Ensure uniquess avoid the cost of additional 4-byte internal uniqueifier column in all indexes, also helps query optimizer generate more efficient query plan.
---		- Ever-increasing: Keep new data always added to the last page of the index, this avoid page splits which reduce page density.
---		- Immutable: The clustered index key is a part of any nonclustered index, so changes on a clustered index will affect to all nonclustered index; it is ideal if clustered index is immutable.
---		- Has not nullable columns only: If a row has nullable columns, it add NULL block (3-4 bytes of storage) per row in an index.
---		- Has fixed width columns only: Using variable width data types use an additional 2 bytes per value (e.g., int use fixed 8 bytes, varchar use predefined width).
---	+ A clustered index key has all of these properties if it is created with a single int/bigint non nullable column, which populated by an IDENTITY clause or a default constraint using a sequence and isn't updated after insertion.
---	+ Clustered index architecture:
---		- Clustered indexes have one row in sys.partitions for each partition used by the index, with index_id = 1.
---		- On each partition, it has a seperate B+ tree structure that contains the data for that specific partition.
---		- A clustered index structure has one or more allocation units for each partition.
---			+ At minimum, each partition has one IN_ROW_DATA allocation unit
---			+ The index has one LOB_DATA allocation unit if it contains large object (LOB) columns such as nvarchar(MAX).
---			+ It also has one ROW_OVERFLOW_DATA allocation unit if it contains variable length columns that exceed the 8060-byte row size limit.
--- 7. Nonclustered index design guidelines
---	+ Nonclustered index should be designed to improve performance of frequently used queries.
---	+ Nonclustered index architecture:
---		- It has the same B+ tree structure as clustered indexes.
---		- The leaf level of a nonclustered index is made up of index pages, they contains key columns, and optionally included columns.
---		- The row locators in nonclustered index are either a pointer to a row or are a clustered index key for a row.
---		- Row locators also ensure uniqueness for nonclustered index rows.
---		- Nonclustered indexes have one row in sys.partitions for each partition used by the index, whith index_id > 1.
---		- On each partition, it has a seperate B+ tree  structure that contains the data for that specific partition.
---		- A nonclustered index structure has one or more allocation unit for each partition.
---			+ At minimum, each partition has one IN_ROW_DATA allocation unit.
---			+ The index has one LOB_DATA allocation unit if it contains large object columns such as nvarchar(MAX).
---			+ It also has one ROW_OVERFLOW_DATA allocation unit if it contains variable length columns that exceed the 8060-byte row size limit.
--- 8. Use included columns in nonclustered indexes
---	+ Cover the queries with included columns can prevent the Index Seek operators.
---	+ Determine whether the gains in query performance outweight the decrease in data modification performance and the increase in disk space requirements.
--- 9. Columnstore index
+--	+ Over-indexing impacts performance of INSERT, UPDATE, DELETE, and MERGE operations.
+--	+ Batch modifications (multi-row statements) reduce index maintenance overhead.
+--	+ Write queries with SARGable predicates to leverage indexes.
+--	+ Use covering indexes with included columns to avoid lookups, but avoid excessive included columns.
+--	+ Keep index keys short, especially for clustered indexes.
+-- 5. Index placement on filegroups/partitions:
+--	+ By default, indexes reside in the same filegroup of the base table.
+--	+ Moves indexes to other filegroups for performance:
+--		- Place frequently accessed tables on faster disks.
+--		- Archive tables can reside on slower disks.
+--	+ Partition tables and indexes across filegroups:
+--		- Makes large databases manageable (e.g., OLAP ETL).
+--		- Enables partition elimimation and parallel query processing.
+-- 6. Clustered index design guidelines:
+--	+ Desirable properties:
+--		- Narrow: small key length reduces storage and overhead.
+--		- Unique: avoids the cost of additional 4-byte internal uniqueifier and improves query plans.
+--		- Ever-increasing: minimizes page splits by appending new rows.
+--		- Immutable: avoid clustered key changes, since the changes affect all nonclustered indexes.
+--		- Non-nullable: avoid NULL block (3-4 bytes of storage) per row in an index.
+--		- Fixed-width types: avoid extra bytes for variable-length types.
+--	+ Ideal clustered index: single int/bigint non-nullable column populated by IDENTITY or SEQUENCE.
+--	+ Architecture:
+--		- One row in sys.partitions per partition (index_id = 1).
+--		- Each partition has a seperate B+ tree.
+--		- Allocation units:
+--			+ IN_ROW_DATA (always present).
+--			+ LOB_DATA (if large object columns exist).
+--			+ ROW_OVERFLOW_DATA (if total variable-length columns exceed 8060 bytes).
+-- 7. Nonclustered index design guidelines:
+--	+ Designed to improve performance of frequent queries.
+--	+ Architecture:
+--		- Same B+ tree structure as clustered indexes.
+--		- Leaf level contains key columns and optionally included columns.
+--		- Row locators point to base table rows (heap or clustered key).
+--		- One row in sys.partitions per partition (index_id > 1).
+--		- Allocation units: IN_ROW_DATA, LOB_DATA, ROW_OVERFLOW_DATA as needed.
+-- 8. Included columns in nonclustered indexes:
+--	+ Cover queries to avoid lookups.
+--	+ Balance performance gains against increased modification cost and storage usage.
+-- 9. Memory-optimized hash index:
+--	+ Array of hash buckets (8 bytes each) pointing to linked lists of key entries.
+--	+ Each entry stores key value and row address, linked to next entry in the bucket.
+--	+ Bucket count specified at creation:
+--		- Too few buckets → long chains, collisions, slower lookups.
+--		- Too many buckets → wasted memory.
+--	+ Best for exact maches (exact values of all key columns), small range search, and table has no dulicates.
+--	+ Poor choice for columns with many duplicate values.
+-- 10. Memory-optimized nonclustered index (Bw-tree):
+--	+ Uses a lock-free, latch-free Bw-tree structure.
+--	+ Components: page map (PidMap), page allocator (PidAlloc), and linked pages.
+--	+ Updates stored as delta records; consolidated into new pages when chains grow.
+--	+ Operations:
+--		- Delta consolidation: merges delta records into a new page when chains reach ~16 changes.
+--		- Page split: creates two new leaf page, updates mapping table, and adjust parent pointers.
+--		- Page merge: triggered when a page is <10% full and can merge with a contiguous sibling.
+--			+ Redirects pointers, rebuilds parent page, updates mapping table, and allocates a new merged leaf page.
 
+
+
+-- Create a new database with In-Memory OLTP enabled
+CREATE DATABASE InMemory
+ON PRIMARY (
+	NAME = InMemoryDB_data,
+	FILENAME = 'D:\Projects\SQL-Projects\Notes\InMemoryDB_data.mdf'
+),
+FILEGROUP InMemoryDB_mod CONTAINS MEMORY_OPTIMIZED_DATA(
+	NAME = InMemoryDB_mod1,
+	FILENAME = 'D:\Projects\SQL-Projects\Notes\InMemoryDB_mod1'
+)
+LOG ON (
+	NAME = InMemoryDB_log,
+	FILENAME = 'D:\Projects\SQL-Projects\Notes\InMemoryDB_log.ldf'
+);
+GO
+
+-- Create a memory-optimized table
+USE InMemory;
+GO
+
+CREATE TABLE dbo.InMemoryTable
+(
+	Id INT NOT NULL PRIMARY KEY NONCLUSTERED HASH WITH (BUCKET_COUNT = 1024),
+	Column1 Nvarchar(100) NOT NULL
+)
+WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_AND_DATA); -- use SCHEMA_ONLY to avoid logging, but data is volatile
+GO
