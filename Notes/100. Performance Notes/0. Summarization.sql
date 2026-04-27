@@ -1,5 +1,14 @@
 
 
+
+-- Table design strategy
+-- 1. Avoid over normalizing table since it make query to use JOIN operations.
+-- 2. Normalize table only when it has many duplicate values, or consists of large object data/ row overflow data.
+-- 3. Make clustered index as narrow as possible, and make it ever-increasing.
+
+
+
+
 -- If a query is slow, go check
 -- 1. Indexes
 --	+ If the query is missing indexes

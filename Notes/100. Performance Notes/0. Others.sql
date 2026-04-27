@@ -33,9 +33,10 @@ GO
 
 
 
--- List data pages per table
-select
-	db_file.name AS [db name],
+-- List data pages per table (types of pages, type of allocation unit, and fragmentation on DATA_PAGE, INDEX_PAGE)
+SELECT
+	DB_NAME(db_file.database_id) AS [db name],
+	db_file.name AS [db file name],
 	db_file.physical_name AS [physical location],
 	SCHEMA_NAME(t.schema_id) AS [schema name],
 	t.object_id AS [table_id],
@@ -53,17 +54,20 @@ select
 	page_alloc.[file id],
 	page_alloc.[page type],
 	page_alloc.[page ids],
-	page_alloc.[number of pages]
-from sys.master_files db_file
-cross join sys.tables t
-join sys.partitions p ON t.object_id = p.object_id
-join sys.allocation_units a 
+	page_alloc.[number of pages],
+	FORMAT(ips.avg_fragmentation_in_percent, '##0.###') + '%' AS [avg fragmentation percent],
+	ISNULL(ips.fragment_count, 0) AS [fragment count],
+	ISNULL(ips.avg_fragment_size_in_pages, 0) AS [avg fragment size]
+FROM sys.master_files db_file
+CROSS JOIN sys.tables t
+JOIN sys.partitions p ON t.object_id = p.object_id
+JOIN sys.allocation_units a 
 	ON a.container_id = 
 		CASE
 			WHEN p.index_id < 256 THEN p.hobt_id
 			ELSE p.partition_id
 		END
-cross apply (
+CROSS APPLY (
 	SELECT 
 		file_id AS [file id],
 		page_type_desc AS [page type],
@@ -73,19 +77,30 @@ cross apply (
 	WHERE allocation_unit_id = a.allocation_unit_id
 	GROUP BY allocation_unit_id, page_type_desc
 ) AS page_alloc
-where db_file.database_id = DB_ID()
-	and db_file.type = 0
-order by [db name], [schema name], [table name], [index type], [allocation type desc];
+LEFT JOIN (
+	SELECT 
+		object_id,
+		index_id,
+		hobt_id,
+		alloc_unit_type_desc COLLATE SQL_Latin1_General_CP1_CI_AS AS alloc_unit_type_desc,
+		avg_fragmentation_in_percent,
+		fragment_count,
+		avg_fragment_size_in_pages
+	FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED')
+) ips ON ips.object_id = t.object_id 
+	AND ips.index_id = p.index_id 
+	AND ips.alloc_unit_type_desc = a.type_desc
+	AND page_alloc.[page type] IN ('DATA_PAGE', 'INDEX_PAGE')
+WHERE db_file.database_id = DB_ID()
+	AND db_file.type = 0
+ORDER BY [db name], [schema name], [table name], [index type], [allocation type desc];
 GO
 
 
 
 
-
-
-
 -- View detailed information of a data page
-select * from sys.dm_db_page_info(5, 1, 12537, 'DETAILED');
+select * from sys.dm_db_page_info(DB_ID('AdventureWorks2025'), 1, 27673, 'DETAILED');
 GO
 
 
