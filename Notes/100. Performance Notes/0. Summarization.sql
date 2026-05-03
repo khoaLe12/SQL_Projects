@@ -120,6 +120,7 @@ GO
 -- Implement failover mechanism for a database to ensure its availability and reliability
 
 
+
 -- Troubleshoot the performance of full-text index population
 -- 1. Review the full-text crawl logs; for default instance, logs are located at folder %ProgramFiles%\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\LOG
 --	+ Crawl log naming scheme: SQLFT<DatabaseID\><FullTextCatalogID\>.LOG[<n\>]
@@ -138,3 +139,26 @@ SELECT
 	p.buffer_count
 FROM sys.dm_fts_memory_buffers b
 INNER JOIN sys.dm_fts_memory_pools p ON b.pool_id = p.pool_id
+
+
+
+
+
+-- Performance counters
+-- 1. SQL Server exposes performance counters through the DMV sys.dm_os_performance_counters, which can be directly queried with T-SQL.
+-- 2. These counters provide real-time, cummulative statistics about SQL Server internals.
+--	+ They're useful for monitoring and diagnosing specific aspects of performance (e.g., buffer cache, I/O, waits).
+-- 3. Windows PerfMon can display these counters visually.
+--	+ It can be configured to track SQL Server counters alongside OS counters for a holistic view.
+-- 4. Sometimes counters don't appear in sys.dm_os_performance_counters, use the following PowerShell commands to reload them:
+--	+ unlodctr MSSQL$SQLEXPRESS
+--	+ lodctr "C:\Program Files\Microsoft SQL Server\MSSQL17.SQLEXPRESS\MSSQL\Binn\perf-SQLAgent$SQLEXPRESSsqlagtctr.ini"
+-- Ex: Query the Page I/O latch waits counter:
+SELECT
+	object_name,
+	counter_name,
+	instance_name,
+	cntr_value,
+	cntr_type
+FROM sys.dm_os_performance_counters
+WHERE object_name = 'MSSQL$SQLEXPRESS:Wait Statistics' AND counter_name = 'Page IO latch waits'

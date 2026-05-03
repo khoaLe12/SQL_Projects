@@ -16,8 +16,10 @@
 --	Each data file contains metadata pages and data pages.
 --	Metadata tracks allocation and usage of space/pages.
 -- 4. Concurrency:
---	Tempdb uses latch queues on each data file to serialize concurrent access.
---	Excessive contention on these latches leads to "tempdb allocation contention" or "page latch waits".
+--	Tempdb uses latch queues on allocation pages (PFS, GAM, SGAM) for each data file to serialize concurrent access.
+--	Excessive contention on these latches leads to "tempdb allocation contention" or "page latch waits", observed as PAGELATCH_* waits.
+--	These allocation pages are cached in memory, so the contention is in-memory synchronization, not disk I/O.
+--	That's why the wait type is PAGELATCH_*, not PAGEIOLATCH_* (which indicates waiting for physical disk I/O).
 -- 5. Detection:
 --	Use DMVs such as sys.dm_os_waiting_tasks and sys.dm_os_wait_stats to identify waiting threads and reasons.
 --	DBCC SQLPERF can reset wait statistics for monitoring.
@@ -32,7 +34,7 @@
 --		+ Enable "memory-optimized tempdb metadata" (SQL Server 2019+).
 --			- Caution: increase memory usage.
 --		+ Use table variables instead of temp table where appropriate (to avoid writing to metadata files), or optimze queries to reduce tempdb usage.
---		+ Place tempdb on seperate physical storage from other system databases to reduce I/O contention.
+--		+ Place tempdb on seperate physical storage from other system databases to reduce I/O contention, preferably SSDs.
 
 
 
@@ -209,7 +211,6 @@ LEFT JOIN sys.dm_exec_requests r On r.request_id = t.request_id AND r.session_id
 OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) AS dest
 CROSS APPLY sys.fn_PageResCracker(r.page_resource) AS prc
 CROSS APPLY sys.dm_db_page_info(prc.db_id, prc.file_id, prc.page_id, 'DETAILED') AS dpi
-
 LEFT JOIN sys.dm_exec_requests br ON br.session_id = r.blocking_session_id
 OUTER APPLY sys.dm_exec_sql_text(br.sql_handle) AS dest_br
 WHERE wt.wait_type LIKE 'PAGELATCH%'
@@ -256,7 +257,7 @@ MODIFY FILE (NAME = temp1, SIZE = 256 MB);
 -- DECREASE (SHRINK) THE FILE SIZE
 USE tempdb;
 GO
-DBCC SHRINKFILE (tempdev, 8);
+DBCC SHRINKFILE (tempdev, 64);
 GO
 
 
