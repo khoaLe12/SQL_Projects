@@ -117,7 +117,16 @@ GO
 
 
 
+
+
 -- Implement failover mechanism for a database to ensure its availability and reliability
+
+
+
+
+-- Build a mechanism to coordinate connections between application and SQL Server, help to avoid creating and destroying too many connection
+
+
 
 
 
