@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
-using SQLAgent.Connections.EFCore.Models;
+using Newtonsoft.Json.Linq;
+using SQLAgent.Connections.Models;
 using SQLAgent.Services.EFCoreServices;
 using System.Net;
 
@@ -18,6 +19,76 @@ namespace SQLAgent.Controllers
         public EFCoreController(IAddressServices addressServices)
         {
             _addressService = addressServices;
+        }
+
+
+        [Route("address/executeget")]
+        [HttpGet, HttpPost]
+        public IActionResult ExecuteGet([FromBody] object? obj)
+        {
+            JObject jObject = JObject.FromObject(obj ?? new object());
+            var addresses = _addressService.ExecuteGet(jObject);
+            return Ok(new ApiResult("00000", addresses, "Success"));
+        }
+
+
+        [Route("address/executeinsert")]
+        [HttpPost]
+        public IActionResult ExecuteInsert([FromBody] object obj)
+        {
+            JObject jObject = JObject.FromObject(obj);
+            int resultInt = _addressService.ExecuteInsert(jObject);
+            if (resultInt == 0)
+            {
+                return Ok(new ApiResult("00000", jObject, "Success"));
+            }
+            else
+            {
+                string message = "Failed";
+                string statusCode = "99999";
+                if (resultInt == 10001)
+                {
+                    message = "State Province ID not found";
+                    statusCode = "10000";
+                }
+                return Ok(new ApiResult(statusCode, resultInt.ToString(), message));
+            }
+        }
+
+
+        [Route("address/executeupdate")]
+        [HttpPost]
+        public IActionResult ExecuteUpdate([FromQuery] int addressId, [FromBody] object obj)
+        {
+            JObject jObject = JObject.FromObject(obj);
+            int resultInt = _addressService.ExecuteUpdate([addressId], jObject);
+            if (resultInt == 0)
+            {
+                jObject.Add("AddressId", addressId);
+                return Ok(new ApiResult("00000", jObject, "Success"));
+            }
+            else
+            {
+                return Ok(new ApiResult(resultInt.ToString(), "", "Failed"));
+
+            }
+        }
+
+
+        [Route("address/executedelete")]
+        [HttpDelete]
+        public IActionResult ExecuteDelete([FromQuery] int addressId)
+        {
+            int resultInt = _addressService.ExecuteDelete([addressId]);
+            if (resultInt == 0)
+            {
+                return Ok(new ApiResult("00000", "", "Success"));
+            }
+            else
+            {
+                return Ok(new ApiResult(resultInt.ToString(), "", "Failed"));
+
+            }
         }
 
 

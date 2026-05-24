@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json.Linq;
+using SQLAgent.Services.ADONetServices;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -8,36 +10,80 @@ namespace SQLAgent.Controllers
     [ApiController]
     public class DapperController : ControllerBase
     {
-        // GET: api/<DapperController>
-        [HttpGet]
-        public IEnumerable<string> Get()
+        private IAddressServices _addressService;
+
+        public DapperController(IAddressServices addressServices)
         {
-            return new string[] { "value1", "value2" };
+            _addressService = addressServices;
         }
 
-        // GET api/<DapperController>/5
-        [HttpGet("{id}")]
-        public string Get(int id)
+        [Route("address/executeget")]
+        [HttpGet, HttpPost]
+        public IActionResult ExecuteGet([FromBody] object? obj)
         {
-            return "value";
+            JObject jObject = JObject.FromObject(obj ?? new object());
+            var addresses = _addressService.ExecuteGet(jObject);
+            return Ok(new ApiResult("00000", addresses, "Success"));
         }
 
-        // POST api/<DapperController>
+
+        [Route("address/executeinsert")]
         [HttpPost]
-        public void Post([FromBody] string value)
+        public IActionResult ExecuteInsert([FromBody] object obj)
         {
+            JObject jObject = JObject.FromObject(obj);
+            int resultInt = _addressService.ExecuteInsert(jObject);
+            if (resultInt == 0)
+            {
+                return Ok(new ApiResult("00000", jObject, "Success"));
+            }
+            else
+            {
+                string message = "Failed";
+                string statusCode = "99999";
+                if (resultInt == 10001)
+                {
+                    message = "State Province ID not found";
+                    statusCode = "10000";
+                }
+                return Ok(new ApiResult(statusCode, resultInt.ToString(), message));
+            }
         }
 
-        // PUT api/<DapperController>/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+
+        [Route("address/executeupdate")]
+        [HttpPost]
+        public IActionResult ExecuteUpdate([FromQuery] int addressId, [FromBody] object obj)
         {
+            JObject jObject = JObject.FromObject(obj);
+            int resultInt = _addressService.ExecuteUpdate(addressId, jObject);
+            if (resultInt == 0)
+            {
+                jObject.Add("AddressId", addressId);
+                return Ok(new ApiResult("00000", jObject, "Success"));
+            }
+            else
+            {
+                return Ok(new ApiResult(resultInt.ToString(), "", "Failed"));
+
+            }
         }
 
-        // DELETE api/<DapperController>/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
+
+        [Route("address/executedelete")]
+        [HttpDelete]
+        public IActionResult ExecuteDelete([FromQuery] int addressId)
         {
+            int resultInt = _addressService.ExecuteDelete(addressId);
+            if (resultInt == 0)
+            {
+                return Ok(new ApiResult("00000", "", "Success"));
+            }
+            else
+            {
+                return Ok(new ApiResult(resultInt.ToString(), "", "Failed"));
+
+            }
         }
     }
 }

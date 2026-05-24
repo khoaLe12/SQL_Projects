@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SQLAgent")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bf56eb79e06a8a5baeb1cf767450a3e792f150d1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f82981b993733b4da3d508bb6f9c0d71797b3d9b")]
 [assembly: System.Reflection.AssemblyProductAttribute("SQLAgent")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SQLAgent")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

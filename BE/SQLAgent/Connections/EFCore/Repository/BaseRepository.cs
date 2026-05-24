@@ -2,10 +2,11 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Newtonsoft.Json.Linq;
 using SQLAgent.Connections.EFCore.Data;
-using SQLAgent.Connections.EFCore.Models;
-using SQLAgent.Connections.EFCore.SysModels;
+using SQLAgent.Connections.Models;
+using SQLAgent.Connections.SysModels;
 using SQLAgent.Services;
 using System;
 using System.Collections;
@@ -43,8 +44,8 @@ public interface IBaseRepository<T, TKeys> where T : BaseEntity where TKeys : IL
 
 public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : BaseEntity where TKeys : IList<object>
 {
-    private sysDAOInfo _sysDAOInfo;
-    private Dictionary<Type, object> defaultValues = new Dictionary<Type, object>
+    private readonly sysDAOInfo _sysDAOInfo;
+    private readonly Dictionary<Type, object> defaultValues = new Dictionary<Type, object>
     {
         { typeof(string), "" },
         { typeof(int), 0 },
@@ -54,9 +55,9 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
         { typeof(TimeOnly), new TimeOnly(0, 0, 0) }
     };
 
-    protected DbConnection _connection;
-    protected AdventureWorks2025Context _applicationDbContext;
-    protected DbSet<T> dbSet;
+    protected readonly DbConnection _connection;
+    protected readonly AdventureWorks2025Context _applicationDbContext;
+    protected readonly DbSet<T> dbSet;
 
     public BaseRepository(AdventureWorks2025Context applicationDbContext)
     {
@@ -69,22 +70,20 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
         string tableName = entity?.GetTableName() ?? "";
         string schema = entity?.GetSchema() ?? "";
 
+        // Should use cache here create a singleton service to store sys information
         sysDAOInfo? dao = _applicationDbContext.Set<sysDAOInfo>()
-            .Where(d => d.schema_name == schema && d.table_name == tableName)
+            .Where(d => d.table_schema == schema && d.table_name == tableName)
             .FirstOrDefault();
 
-        if (dao is null)
-        {
-            throw new BaseRepoException();
-        }
-
-        _sysDAOInfo = dao;
+        _sysDAOInfo = dao ?? new sysDAOInfo();
     }
 
     public virtual DataTable ExecuteGet(JObject search)
     {
+        BeforeExecute();
+
         string sp_get = _sysDAOInfo.sp_get;
-        string schema_name = _sysDAOInfo.schema_name;
+        string schema_name = _sysDAOInfo.sp_schema;
 
         DbCommand? dbCommand = null;
         try
@@ -102,11 +101,11 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
                 string value = "";
                 if (property.Type == JTokenType.Date)
                 {
-                    value = property.Value<DateTime>().ToString("yyyy-MM-ddTHH:mm:ss");
+                    value = property.Value.Value<DateTime>().ToString("yyyy-MM-ddTHH:mm:ss");
                 }
                 else
                 {
-                    value = property.Value<string>() ?? "";
+                    value = property.Value.Value<string>() ?? "";
                 }
                 parameter.Value = value;
 
@@ -136,8 +135,10 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
 
     public virtual int ExecuteInsert(JObject data)
     {
+        BeforeExecute();
+
         string sp_ins = _sysDAOInfo.sp_ins;
-        string schema_name = _sysDAOInfo.schema_name;
+        string schema_name = _sysDAOInfo.sp_schema;
 
         DbCommand? dbCommand = null;
         try
@@ -155,11 +156,11 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
                 string value = "";
                 if (property.Type == JTokenType.Date)
                 {
-                    value = property.Value<DateTime>().ToString("yyyy-MM-ddTHH:mm:ss");
+                    value = property.Value.Value<DateTime>().ToString("yyyy-MM-ddTHH:mm:ss");
                 }
                 else
                 {
-                    value = property.Value<string>() ?? "";
+                    value = property.Value.Value<string>() ?? "";
                 }
                 parameter.Value = value;
 
@@ -167,15 +168,44 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             }
 
             parameters = getParamForProc(schema_name, sp_ins, parameters);
-            dbCommand.CommandText = $"EXEC [{schema_name}].[{sp_ins}] {string.Join(", ", parameters.Select(p => p.ParameterName))}";
+            dbCommand.CommandText = $"EXEC [{schema_name}].[{sp_ins}] {string.Join(", ", parameters.Select(p =>
+            {
+                if (p.Direction == ParameterDirection.InputOutput || p.Direction == ParameterDirection.Output)
+                {
+                    return  $"{p.ParameterName} OUTPUT";
+                }
+                return p.ParameterName;
+            }))}";
             dbCommand.Parameters.AddRange(parameters.ToArray());
-            int rows = dbCommand.ExecuteNonQuery();
+            DbDataReader dbDataReader = dbCommand.ExecuteReader();
 
             int resultInt = (int?)dbCommand.Parameters["@pRet"].Value ?? 0;
+
+            if (resultInt == 0)
+            {
+                DataTable table = new DataTable();
+                table.Load(dbDataReader);
+                var keys = table.Rows[0];
+
+                var entity = _applicationDbContext.Model.FindEntityType(typeof(T));
+                IKey? eKey = entity?.GetKeys().FirstOrDefault(e => e.IsPrimaryKey());
+                if (eKey is not null)
+                {
+                    for (int i = 0; i < eKey.Properties.Count; i++)
+                    {
+                        var columnName = eKey.Properties.ElementAtOrDefault(i)?.Name ?? "";
+                        if (table.Columns.Contains(columnName))
+                        {
+                            data[columnName] = JToken.FromObject(keys[columnName] ?? "");
+                        }
+                    }
+                }
+            }
 
             dbCommand.Dispose();
             _connection.Close();
 
+            AfterExecute();
             return resultInt;
         }
         catch (Exception ex)
@@ -189,8 +219,10 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
 
     public virtual int ExecuteUpdate(TKeys keys, JObject data)
     {
+        BeforeExecute();
+
         string sp_upd = _sysDAOInfo.sp_upd;
-        string schema_name = _sysDAOInfo.schema_name;
+        string schema_name = _sysDAOInfo.sp_schema;
 
         DbCommand? dbCommand = null;
         try
@@ -208,11 +240,11 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
                 string value = "";
                 if (property.Type == JTokenType.Date)
                 {
-                    value = property.Value<DateTime>().ToString("yyyy-MM-ddTHH:mm:ss");
+                    value = property.Value.Value<DateTime>().ToString("yyyy-MM-ddTHH:mm:ss");
                 }
                 else
                 {
-                    value = property.Value<string>() ?? "";
+                    value = property.Value.Value<string>() ?? "";
                 }
                 parameter.Value = value;
 
@@ -247,7 +279,14 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             }
 
             parameters = getParamForProc(schema_name, sp_upd, parameters);
-            dbCommand.CommandText = $"EXEC [{schema_name}].[{sp_upd}] {string.Join(", ", parameters.Select(p => p.ParameterName))}";
+            dbCommand.CommandText = $"EXEC [{schema_name}].[{sp_upd}] {string.Join(", ", parameters.Select(p =>
+            {
+                if (p.Direction == ParameterDirection.InputOutput || p.Direction == ParameterDirection.Output)
+                {
+                    return $"{p.ParameterName} OUTPUT";
+                }
+                return p.ParameterName;
+            }))}";
             dbCommand.Parameters.AddRange(parameters.ToArray());
             int rows = dbCommand.ExecuteNonQuery();
 
@@ -256,6 +295,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             dbCommand.Dispose();
             _connection.Close();
 
+            AfterExecute();
             return resultInt;
         }
         catch (Exception ex)
@@ -269,8 +309,10 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
 
     public virtual int ExecuteDelete(TKeys keys)
     {
+        BeforeExecute();
+
         string sp_upd = _sysDAOInfo.sp_del;
-        string schema_name = _sysDAOInfo.schema_name;
+        string schema_name = _sysDAOInfo.sp_schema;
 
         DbCommand? dbCommand = null;
         try
@@ -316,6 +358,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             dbCommand.Dispose();
             _connection.Close();
 
+            AfterExecute();
             return resultInt;
         }
         catch (Exception ex)
@@ -326,9 +369,11 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             throw;
         }
     }
-
+    
     public virtual DataTable ExecuteRawSQL(Expression<Func<T, bool>>? where, List<string> columns, int skip, int take)
     {
+        BeforeExecute();
+
         if (take == 0) take = 10;
         DbCommand? dbCommand = null;
         DbTransaction? transaction = null;
@@ -340,11 +385,11 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             {
                 if (where.Parameters.Count() == 0)
                 {
-                    throw new BaseRepoException();
+                    throw new BaseEFRepoException();
                 }
                 if (where.Parameters.Count() > 1)
                 {
-                    throw new BaseRepoException();
+                    throw new BaseEFRepoException();
                 }
                 whereCondition = where.Body;
                 whereParameter = where.Parameters[0];
@@ -353,14 +398,14 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             var entity = _applicationDbContext.Model.FindEntityType(typeof(T));
             if (entity is null)
             {
-                throw new BaseRepoException();
+                throw new BaseEFRepoException();
             }
 
             string tableName = entity.GetTableName() ?? "";
             string schema = entity.GetSchema() ?? "";
             if (string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(schema))
             {
-                throw new BaseRepoException();
+                throw new BaseEFRepoException();
             }
 
             StringBuilder stringBuilder = new StringBuilder();
@@ -371,7 +416,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
                     var property = entity!.FindProperty(column);
                     if (property is null)
                     {
-                        throw new BaseRepoException();
+                        throw new BaseEFRepoException();
                     }
                     stringBuilder.Append(column + ",");
                 }
@@ -409,6 +454,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             dbCommand.Dispose();
             _connection.Close();
 
+            AfterExecute();
             return table;
         }
         catch (Exception ex)
@@ -493,7 +539,8 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
         _applicationDbContext.Set<T>(entityTypeName).Update(entity);
     }
 
-    private List<DbParameter> getParamForProc(string sc_name, string sp_name, List<DbParameter> parameters)
+
+    protected virtual List<DbParameter> getParamForProc(string sc_name, string sp_name, List<DbParameter> parameters)
     {
         List<DbParameter> result = new List<DbParameter>();
 
@@ -512,7 +559,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
             string parameter_name = parameter["PARAMETER_NAME"].ToString() ?? "";
             string data_type = parameter["DATA_TYPE"].ToString() ?? "";
 
-            DbParameter? cParam = parameters.Find(p => p.ParameterName.ToLower() == p.ParameterName.ToLower());
+            DbParameter? cParam = parameters.Find(p => p.ParameterName.ToLower() == parameter_name.ToLower());
             DbParameter param = new SqlParameter();
             param.Direction = direction;
             if (cParam is not null)
@@ -569,14 +616,16 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
 
         return result;
     }
+    protected virtual void BeforeExecute() { }
+    protected virtual void AfterExecute() { }
 }
 
-public class BaseRepoException : Exception
+public class BaseEFRepoException : Exception
 {
-    public BaseRepoException() : base() { }
-    public BaseRepoException(string? s) : base(s) { }
+    public BaseEFRepoException() : base() { }
+    public BaseEFRepoException(string? s) : base(s) { }
 
-    public BaseRepoException(string? message, Exception? innerException) : base(message, innerException) { }
+    public BaseEFRepoException(string? message, Exception? innerException) : base(message, innerException) { }
 }
 
 public class SqlExpressionVisitor : ExpressionVisitor

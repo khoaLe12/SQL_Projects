@@ -1,12 +1,105 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "D:\\Projects\\SQL-Projects\\BE\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|d:\\projects\\sql-projects\\be\\sqlagent\\connections\\efcore\\repository\\baserepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|solutionrelative:sqlagent\\connections\\efcore\\repository\\baserepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|d:\\projects\\sql-projects\\be\\sqlagent\\connections\\efcore\\repository\\addressrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|solutionrelative:sqlagent\\connections\\efcore\\repository\\addressrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|d:\\projects\\sql-projects\\be\\sqlagent\\connections\\efcore\\repository\\businessentityaddressrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|solutionrelative:sqlagent\\connections\\efcore\\repository\\businessentityaddressrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|d:\\projects\\sql-projects\\be\\sqlagent\\connections\\dapper\\data\\adventureworks2025connection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|solutionrelative:sqlagent\\connections\\dapper\\data\\adventureworks2025connection.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|d:\\projects\\sql-projects\\be\\sqlagent\\connections\\dapper\\repository\\baserepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{68D69881-DB1F-4662-9487-C93F1D33473A}|SQLAgent\\SQLAgent.csproj|solutionrelative:sqlagent\\connections\\dapper\\repository\\baserepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": []
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "AddressRepository.cs",
+              "DocumentMoniker": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\EFCore\\Repository\\AddressRepository.cs",
+              "RelativeDocumentMoniker": "SQLAgent\\Connections\\EFCore\\Repository\\AddressRepository.cs",
+              "ToolTip": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\EFCore\\Repository\\AddressRepository.cs",
+              "RelativeToolTip": "SQLAgent\\Connections\\EFCore\\Repository\\AddressRepository.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-24T13:22:01.286Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "BaseRepository.cs",
+              "DocumentMoniker": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\EFCore\\Repository\\BaseRepository.cs",
+              "RelativeDocumentMoniker": "SQLAgent\\Connections\\EFCore\\Repository\\BaseRepository.cs",
+              "ToolTip": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\EFCore\\Repository\\BaseRepository.cs",
+              "RelativeToolTip": "SQLAgent\\Connections\\EFCore\\Repository\\BaseRepository.cs",
+              "ViewState": "AgIAALsAAAAAAAAAAADwvwAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-24T13:22:00.603Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "BusinessEntityAddressRepository.cs",
+              "DocumentMoniker": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\EFCore\\Repository\\BusinessEntityAddressRepository.cs",
+              "RelativeDocumentMoniker": "SQLAgent\\Connections\\EFCore\\Repository\\BusinessEntityAddressRepository.cs",
+              "ToolTip": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\EFCore\\Repository\\BusinessEntityAddressRepository.cs",
+              "RelativeToolTip": "SQLAgent\\Connections\\EFCore\\Repository\\BusinessEntityAddressRepository.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-24T13:21:58.866Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "AdventureWorks2025Connection.cs",
+              "DocumentMoniker": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\Dapper\\Data\\AdventureWorks2025Connection.cs",
+              "RelativeDocumentMoniker": "SQLAgent\\Connections\\Dapper\\Data\\AdventureWorks2025Connection.cs",
+              "ToolTip": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\Dapper\\Data\\AdventureWorks2025Connection.cs",
+              "RelativeToolTip": "SQLAgent\\Connections\\Dapper\\Data\\AdventureWorks2025Connection.cs",
+              "ViewState": "AgIAAEgAAAAAAAAAAAA7wFAAAAApAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-24T13:16:13.226Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "BaseRepository.cs",
+              "DocumentMoniker": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\Dapper\\Repository\\BaseRepository.cs",
+              "RelativeDocumentMoniker": "SQLAgent\\Connections\\Dapper\\Repository\\BaseRepository.cs",
+              "ToolTip": "D:\\Projects\\SQL-Projects\\BE\\SQLAgent\\Connections\\Dapper\\Repository\\BaseRepository.cs",
+              "RelativeToolTip": "SQLAgent\\Connections\\Dapper\\Repository\\BaseRepository.cs",
+              "ViewState": "AgIAADkAAAAAAAAAAAAgwEYAAAA5AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-24T12:01:54.533Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

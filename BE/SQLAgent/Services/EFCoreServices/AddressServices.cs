@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using SQLAgent.Connections.EFCore.Data;
-using SQLAgent.Connections.EFCore.Models;
+using SQLAgent.Connections.Models;
 using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -11,7 +11,7 @@ namespace SQLAgent.Services.EFCoreServices;
 public interface IAddressServices
 {
     DataTable ExecuteGet(JObject dataSearch);
-    int ExecuteIns(JObject data);
+    int ExecuteInsert(JObject data);
     int ExecuteUpdate(object[] keys, JObject data);
     int ExecuteDelete(object[] keys);
     IEnumerable<Address> GetAddresses(int startPage, int endPage, int quantity, int? addressId, string? city);
@@ -36,7 +36,7 @@ public class AddressServices : IAddressServices
         return _unitOfWork.AddressRepository.ExecuteGet(dataSearch);
     }
 
-    public int ExecuteIns(JObject data)
+    public int ExecuteInsert(JObject data)
     {
         return _unitOfWork.AddressRepository.ExecuteInsert(data);
     }

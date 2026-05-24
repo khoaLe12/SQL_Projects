@@ -12,4 +12,9 @@ public class ApiResult
         Data = data;
         Message = message;
     }
+
+    public override string ToString()
+    {
+        return $"{{\"StatusCode\":\"{StatusCode}\", \"Data\":\"{Data.ToString()}\", \"Message\":\"{Message}\"}}";
+    }
 }

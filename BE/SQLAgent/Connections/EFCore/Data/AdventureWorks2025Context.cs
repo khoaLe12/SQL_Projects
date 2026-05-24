@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
-using SQLAgent.Connections.EFCore.Models;
-using SQLAgent.Connections.EFCore.SysModels;
+using SQLAgent.Connections.Models;
+using SQLAgent.Connections.SysModels;
 
 namespace SQLAgent.Connections.EFCore.Data;
 
@@ -209,8 +209,8 @@ public partial class AdventureWorks2025Context : DbContext, IAdventureWorks2025C
         var result = await base.SaveChangesAsync(cancellationToken);
         return result;
     }
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        => optionsBuilder.UseSqlServer("");
+    //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    //    => optionsBuilder.UseSqlServer("");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -3239,7 +3239,12 @@ public partial class AdventureWorks2025Context : DbContext, IAdventureWorks2025C
                 .OnDelete(DeleteBehavior.ClientSetNull);
         });
 
-        modelBuilder.Entity<sysDAOInfo>();
+        modelBuilder.Entity<sysDAOInfo>(entity =>
+        {
+            entity.HasKey(e => e.id);
+
+            entity.ToTable("sysDAOInfo", "dbo");
+        });
 
         OnModelCreatingPartial(modelBuilder);
     }
