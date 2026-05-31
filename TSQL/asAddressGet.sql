@@ -7,6 +7,14 @@ CREATE OR ALTER PROCEDURE [dbo].[asAddressGet]
 AS
 	IF @pAddressID IS NULL
 		SET @pAddressID = 0
+	IF @pAddressLine1 IS NULL
+		SET @pAddressLine1 = ''
+	IF @pAddressLine2 IS NULL
+		SET @pAddressLine2 = ''
+	IF @pCity IS NULL
+		SET @pCity = ''
+	IF @pStateProvinceCode IS NULL
+		SET @pStateProvinceCode = ''
 
 	SELECT
 		a.AddressID,

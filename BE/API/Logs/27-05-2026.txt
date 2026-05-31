@@ -1,0 +1,143 @@
+﻿System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 37
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 37
+   at SQLAgent.DependencyInjection.<>c.<AddADONetDependencies>b__1_1(IServiceProvider provider) in D:\Projects\SQL-Projects\BE\SQLAgent\DependencyInjection.cs:line 45
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+   at lambda_method3(Closure, IServiceProvider, Object[])
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.InvokeFilterPipelineAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at SQLAgent.GlobalExceptionMiddleware.InvokeAsync(HttpContext httpContext) in D:\Projects\SQL-Projects\BE\SQLAgent\GlobalExceptionMiddleware.cs:line 22
+
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 37
+
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 37
+   at SQLAgent.DependencyInjection.<>c.<AddADONetDependencies>b__1_1(IServiceProvider provider) in D:\Projects\SQL-Projects\BE\SQLAgent\DependencyInjection.cs:line 45
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+   at lambda_method3(Closure, IServiceProvider, Object[])
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.InvokeFilterPipelineAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at SQLAgent.GlobalExceptionMiddleware.InvokeAsync(HttpContext httpContext) in D:\Projects\SQL-Projects\BE\SQLAgent\GlobalExceptionMiddleware.cs:line 22
+
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 38
+
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 38
+   at SQLAgent.DependencyInjection.<>c.<AddADONetDependencies>b__1_1(IServiceProvider provider) in D:\Projects\SQL-Projects\BE\SQLAgent\DependencyInjection.cs:line 45
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+   at lambda_method3(Closure, IServiceProvider, Object[])
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.InvokeFilterPipelineAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at SQLAgent.GlobalExceptionMiddleware.InvokeAsync(HttpContext httpContext) in D:\Projects\SQL-Projects\BE\SQLAgent\GlobalExceptionMiddleware.cs:line 22
+
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 37
+
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 37
+
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 37
+
+===============================================================================
+
+System.InvalidOperationException: Injected repository is invalid, repository
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 37
+   at SQLAgent.DependencyInjection.<>c.<AddADONetDependencies>b__1_1(IServiceProvider provider) in D:\Projects\SQL-Projects\BE\SQLAgent\DependencyInjection.cs:line 45
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+   at lambda_method3(Closure, IServiceProvider, Object[])
+   at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.InvokeFilterPipelineAsync()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+   at SQLAgent.GlobalExceptionMiddleware.InvokeAsync(HttpContext httpContext) in D:\Projects\SQL-Projects\BE\SQLAgent\GlobalExceptionMiddleware.cs:line 22
+
+===============================================================================
+
+System.InvalidCastException: Unable to cast object of type 'SQLAgent.Connections.Dapper.Repository.AddressRepository' to type 'SQLAgent.Connections.Dapper.Repository.IBaseRepository`2[SQLAgent.Connections.Models.BaseEntity,SQLAgent.Connections.Dapper.Repository.RepositoryKey]'.
+   at SQLAgent.Connections.Dapper.Data.UnitOfWork..ctor(AdventureWorks2025Connection connection, IServiceProvider serviceProvider, List`1 repositories) in D:\Projects\SQL-Projects\BE\SQLAgent\Connections\Dapper\Data\UnitOfWork.cs:line 40
