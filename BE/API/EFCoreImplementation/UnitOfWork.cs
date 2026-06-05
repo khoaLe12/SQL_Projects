@@ -1,7 +1,7 @@
-﻿using SQLAgent.EFCoreImplementation.Repositories;
+﻿using API.EFCoreImplementation.Repositories;
 using System.Linq.Expressions;
 
-namespace SQLAgent.EFCoreImplementation;
+namespace API.EFCoreImplementation;
 
 public interface IUnitOfWork
 {

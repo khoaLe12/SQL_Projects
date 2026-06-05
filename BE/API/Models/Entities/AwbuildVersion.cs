@@ -1,8 +1,8 @@
-﻿using SQLAgent.Models.BaseModel;
+﻿using API.Models.BaseModel;
 using System;
 using System.Collections.Generic;
 
-namespace SQLAgent.Models.Entities;
+namespace API.Models.Entities;
 
 /// <summary>
 /// Current version number of the AdventureWorks 2025 sample database. 

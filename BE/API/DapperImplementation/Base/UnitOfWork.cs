@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using SQLAgent.Models;
-using SQLAgent.Utilities;
+using API.Models;
+using API.Utilities;
 using System;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
-namespace SQLAgent.DapperImplementation.Base;
+namespace API.DapperImplementation.Base;
 
 
 public interface IUnitOfWork

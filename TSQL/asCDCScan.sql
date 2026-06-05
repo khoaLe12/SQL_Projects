@@ -1,0 +1,4 @@
+CREATE OR ALTER PROCEDURE [dbo].[asCDCScan]
+	@pRet Int OUTPUT
+AS
+

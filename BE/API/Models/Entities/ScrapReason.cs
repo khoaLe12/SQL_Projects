@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace SQLAgent.Models.Entities;
+namespace API.Models.Entities;
 
 /// <summary>
 /// Manufacturing failure reasons lookup table.

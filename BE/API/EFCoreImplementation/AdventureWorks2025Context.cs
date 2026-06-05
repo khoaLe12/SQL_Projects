@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
-using SQLAgent.Models.Entities;
-using SQLAgent.Models.SysEntities;
+using API.Models.Entities;
+using API.Models.SysEntities;
 
-namespace SQLAgent.EFCoreImplementation;
+namespace API.EFCoreImplementation;
 
 public interface IAdventureWorks2025Context : IDisposable
 {

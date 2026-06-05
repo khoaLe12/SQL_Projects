@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace SQLAgent.Models.Entities;
+namespace API.Models.Entities;
 
 /// <summary>
 /// Cross-reference table mapping stores, vendors, and employees to people

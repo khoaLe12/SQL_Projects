@@ -1,4 +1,4 @@
-﻿namespace SQLAgent.Utilities;
+﻿namespace API.Utilities;
 
 public class ApiResult
 {

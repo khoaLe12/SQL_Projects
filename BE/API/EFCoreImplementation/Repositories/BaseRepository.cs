@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Newtonsoft.Json.Linq;
-using SQLAgent.EFCoreImplementation;
-using SQLAgent.Utilities;
+using API.EFCoreImplementation;
+using API.Utilities;
 using System;
 using System.Collections;
 using System.Collections.Immutable;
@@ -15,10 +15,10 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
-using SQLAgent.Models.SysEntities;
-using SQLAgent.Models.BaseModel;
+using API.Models.SysEntities;
+using API.Models.BaseModel;
 
-namespace SQLAgent.EFCoreImplementation.Repositories;
+namespace API.EFCoreImplementation.Repositories;
 
 public interface IBaseRepository<T, TKeys> where T : BaseEntity where TKeys : IList<object>
 {

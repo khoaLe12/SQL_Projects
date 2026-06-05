@@ -1,13 +1,13 @@
 ﻿using Dapper;
 using Microsoft.Data.SqlClient;
 using Newtonsoft.Json.Linq;
-using SQLAgent.Models;
+using API.Models;
 using System.Data;
 using System.Globalization;
 using System.Linq.Expressions;
 using static Dapper.SqlMapper;
 
-namespace SQLAgent.DapperImplementation.Base;
+namespace API.DapperImplementation.Base;
 
 public sealed class AdventureWorks2025Connection : IDisposable
 {

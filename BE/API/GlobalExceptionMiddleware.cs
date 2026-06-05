@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using SQLAgent.Utilities;
+using API.Utilities;
 using System.Net;
 
-namespace SQLAgent;
+namespace API;
 
 public class GlobalExceptionMiddleware
 {

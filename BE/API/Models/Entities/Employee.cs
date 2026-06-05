@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace SQLAgent.Models.Entities;
+namespace API.Models.Entities;
 
 /// <summary>
 /// Employee information such as salary, department, and title.

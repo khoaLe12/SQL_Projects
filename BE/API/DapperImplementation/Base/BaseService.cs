@@ -1,9 +1,9 @@
 ﻿using Dapper;
 using Newtonsoft.Json.Linq;
-using SQLAgent.Models.SysEntities;
-using SQLAgent.Utilities;
+using API.Models.SysEntities;
+using API.Utilities;
 
-namespace SQLAgent.DapperImplementation.Base;
+namespace API.DapperImplementation.Base;
 
 public interface IBaseService
 {
@@ -49,7 +49,7 @@ public class BaseService : IBaseService
             }
         }
 
-        var result = repository.ExecuteQuery(sysDAOInfo.sp_get, parameters);
+        var result = repository.ExecuteQuery(sysDAOInfo.sp_get, ref parameters);
         apiResult.Data = result;
         apiResult.StatusCode = "00000";
         apiResult.Message = "Get successful";

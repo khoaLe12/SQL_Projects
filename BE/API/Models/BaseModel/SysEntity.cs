@@ -1,4 +1,4 @@
-﻿namespace SQLAgent.Models.BaseModel;
+﻿namespace API.Models.BaseModel;
 
 public class SysEntity
 {

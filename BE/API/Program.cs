@@ -1,7 +1,7 @@
 ﻿
 using Microsoft.OpenApi;
-using SQLAgent;
-using SQLAgent.DependencyInjection;
+using API;
+using API.DependencyInjection;
 
 
 
@@ -11,6 +11,7 @@ var Configuration = builder.Configuration;
 // Add services to the container.
 builder.Services.AddEFCoreDependencies(Configuration);
 builder.Services.AddDapperDependencies(Configuration);
+builder.Services.AddCoreDependencies();
 
 builder.Services.AddMvc();
 builder.Services.AddControllers(options => { })

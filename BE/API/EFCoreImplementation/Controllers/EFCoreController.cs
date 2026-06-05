@@ -2,14 +2,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
 using Newtonsoft.Json.Linq;
-using SQLAgent.EFCoreImplementation.Services;
-using SQLAgent.Models.Entities;
-using SQLAgent.Utilities;
+using API.EFCoreImplementation.Services;
+using API.Models.Entities;
+using API.Utilities;
 using System.Net;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
-namespace SQLAgent.EFCoreImplementation.Controllers
+namespace API.EFCoreImplementation.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]

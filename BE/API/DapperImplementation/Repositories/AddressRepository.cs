@@ -1,8 +1,8 @@
-﻿using SQLAgent.DapperImplementation.Base;
-using SQLAgent.Models.BaseModel;
-using SQLAgent.Models.Entities;
+﻿using API.DapperImplementation.Base;
+using API.Models.BaseModel;
+using API.Models.Entities;
 
-namespace SQLAgent.DapperImplementation.Repositories;
+namespace API.DapperImplementation.Repositories;
 
 public class AddressKey : EntityKey
 {

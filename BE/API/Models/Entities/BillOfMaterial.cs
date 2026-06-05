@@ -1,8 +1,8 @@
-﻿using SQLAgent.Models.BaseModel;
+﻿using API.Models.BaseModel;
 using System;
 using System.Collections.Generic;
 
-namespace SQLAgent.Models.Entities;
+namespace API.Models.Entities;
 
 /// <summary>
 /// Items required to make bicycles and bicycle subassemblies. It identifies the heirarchical relationship between a parent product and its components.

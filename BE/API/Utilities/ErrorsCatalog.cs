@@ -2,7 +2,7 @@
 using System;
 using System.Text;
 
-namespace SQLAgent.Utilities;
+namespace API.Utilities;
 
 public static class ErrorsCatalog
 {

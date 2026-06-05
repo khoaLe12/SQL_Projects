@@ -1,8 +1,8 @@
 ﻿using Newtonsoft.Json.Linq;
-using SQLAgent.DapperImplementation.Base;
-using SQLAgent.DapperImplementation.Repositories;
+using API.DapperImplementation.Base;
+using API.DapperImplementation.Repositories;
 
-namespace SQLAgent.DapperImplementation.Services;
+namespace API.DapperImplementation.Services;
 
 public interface IAddressServices
 {

@@ -1,8 +1,8 @@
-﻿using SQLAgent.Models.BaseModel;
+﻿using API.Models.BaseModel;
 using System;
 using System.Collections.Generic;
 
-namespace SQLAgent.Models.Entities;
+namespace API.Models.Entities;
 
 /// <summary>
 /// Source of the ID that connects vendors, customers, and employees with address and contact information.

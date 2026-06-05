@@ -1,9 +1,10 @@
-﻿using SQLAgent.DapperImplementation.Base;
-using SQLAgent.DapperImplementation.Repositories;
-using SQLAgent.DapperImplementation.Services;
-using SQLAgent.Models;
+﻿using API.DapperImplementation.Base;
+using API.DapperImplementation.Repositories;
+using API.DapperImplementation.Services;
+using API.Models;
+using System.Reflection;
 
-namespace SQLAgent.DependencyInjection;
+namespace API.DependencyInjection;
 
 public partial class DependencyInjection
 {
@@ -18,6 +19,22 @@ public partial class DependencyInjection
         services.AddScoped<IAddressServices, AddressServices>();
 
         services.AddScoped<IBusinessEntityAddressRepository, BusinessEntityAddressRepository>();
+
+        Type type = typeof(DependencyInjection);
+        MethodInfo[] methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+        foreach (var method in methods)
+        {
+            if (method.IsSpecialName || method.Name == nameof(AddDapperDependencies)) continue;
+
+            if (method.GetParameters().Length == 2 && method.GetParameters()[0].ParameterType == typeof(IServiceCollection) && method.GetParameters()[1].ParameterType == typeof(IConfiguration))
+            {
+                method.Invoke(null, new object[] { services, configuration });
+            }
+            if (method.GetParameters().Length == 1 && method.GetParameters()[0].ParameterType == typeof(IServiceCollection))
+            {
+                method.Invoke(null, new object[] { services });
+            }
+        }
 
         return services;
     }
