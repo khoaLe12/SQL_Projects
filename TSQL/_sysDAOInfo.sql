@@ -1,6 +1,3 @@
-IF OBJECT_ID('dbo.sysDAOInfo', 'U') IS NOT NULL
-	DROP TABLE dbo.sysDAOInfo
-
 IF OBJECT_ID('dbo.sysDAOInfo', 'U') IS NULL
 BEGIN
 	CREATE TABLE [dbo].[sysDAOInfo] (
