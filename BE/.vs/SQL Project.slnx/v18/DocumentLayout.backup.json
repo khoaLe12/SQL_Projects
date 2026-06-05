@@ -5,10 +5,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{CBFA08EA-AECE-205F-7B85-326FD0B81BAD}|API\\API.csproj|d:\\projects\\sql-projects\\be\\api\\dapperimplementation\\base\\basecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{CBFA08EA-AECE-205F-7B85-326FD0B81BAD}|API\\API.csproj|solutionrelative:api\\dapperimplementation\\base\\basecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{CBFA08EA-AECE-205F-7B85-326FD0B81BAD}|API\\API.csproj|d:\\projects\\sql-projects\\be\\api\\efcoreimplementation\\controllers\\efcorecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{CBFA08EA-AECE-205F-7B85-326FD0B81BAD}|API\\API.csproj|solutionrelative:api\\efcoreimplementation\\controllers\\efcorecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,21 +14,8 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 0,
           "Children": [
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "EFCoreController.cs",
-              "DocumentMoniker": "D:\\Projects\\SQL-Projects\\BE\\API\\EFCoreImplementation\\Controllers\\EFCoreController.cs",
-              "RelativeDocumentMoniker": "API\\EFCoreImplementation\\Controllers\\EFCoreController.cs",
-              "ToolTip": "D:\\Projects\\SQL-Projects\\BE\\API\\EFCoreImplementation\\Controllers\\EFCoreController.cs",
-              "RelativeToolTip": "API\\EFCoreImplementation\\Controllers\\EFCoreController.cs",
-              "ViewState": "AgIAABEAAAAAAAAAAAAIwBIAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T03:58:18.124Z",
-              "EditorCaption": ""
-            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
@@ -41,9 +24,9 @@
               "RelativeDocumentMoniker": "API\\DapperImplementation\\Base\\BaseController.cs",
               "ToolTip": "D:\\Projects\\SQL-Projects\\BE\\API\\DapperImplementation\\Base\\BaseController.cs",
               "RelativeToolTip": "API\\DapperImplementation\\Base\\BaseController.cs",
-              "ViewState": "AgIAAA8AAAAAAAAAAAAcwBUAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAABYAAAAAAAAAAAAqwCQAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T02:58:42.509Z",
+              "WhenOpened": "2026-06-02T13:06:32.041Z",
               "EditorCaption": ""
             }
           ]

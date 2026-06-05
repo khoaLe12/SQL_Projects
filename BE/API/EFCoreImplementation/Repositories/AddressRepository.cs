@@ -1,10 +1,10 @@
 ﻿using Microsoft.Data.SqlClient;
-using SQLAgent.EFCoreImplementation;
-using SQLAgent.Models.Entities;
+using API.EFCoreImplementation;
+using API.Models.Entities;
 using System.Data;
 using System.Data.Common;
 
-namespace SQLAgent.EFCoreImplementation.Repositories;
+namespace API.EFCoreImplementation.Repositories;
 
 public partial interface IAddressRepository : IBaseRepository<Address, object[]>
 {

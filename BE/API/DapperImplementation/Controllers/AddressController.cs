@@ -1,12 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
-using SQLAgent.DapperImplementation.Services;
-using SQLAgent.Utilities;
+using API.DapperImplementation.Services;
+using API.Utilities;
 
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
-namespace SQLAgent.DapperImplementation.Controllers;
+namespace API.DapperImplementation.Controllers;
 
 [Route("api/dapper/[controller]")]
 [ApiController]

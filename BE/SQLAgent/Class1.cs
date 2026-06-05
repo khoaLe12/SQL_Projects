@@ -1,4 +1,4 @@
-﻿namespace SQLAgent
+﻿namespace API
 {
     public class Class1
     {

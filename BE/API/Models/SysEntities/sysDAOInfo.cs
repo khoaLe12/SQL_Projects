@@ -1,6 +1,6 @@
-﻿using SQLAgent.Models.BaseModel;
+﻿using API.Models.BaseModel;
 
-namespace SQLAgent.Models.SysEntities;
+namespace API.Models.SysEntities;
 
 public class sysDAOInfo : SysEntity
 {

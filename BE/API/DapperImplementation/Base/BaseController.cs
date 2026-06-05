@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 using System.Net;
+using System.Security.Claims;
 
 namespace API.DapperImplementation.Base;
 
@@ -14,11 +16,11 @@ public class TransactionInformation
     public DateTime ExpireAt { get; set; }
     public string JWTToken { get; set; } = string.Empty;
     public List<string> Roles { get; set; } = new List<string>();
+    public List<Claim> Claims { get; set; } = new List<Claim>();
 }
 
 public class BaseController : ControllerBase
 {
-    protected bool IsValidToken { get; set; } = false;
     protected TransactionInformation Transaction { get; set; }
 
     public BaseController()
@@ -31,11 +33,17 @@ public class BaseController : ControllerBase
         if (token != StringValues.Empty)
         {
             transaction.Token = token[0] ?? "";
-            if (!string.IsNullOrEmpty(transaction.Token))
-            {
-                IsValidToken = true;
-            }
         }
+
+        List<Claim> claims = User.Claims.ToList();
+        transaction.Claims = claims;
+
+        transaction.User_id = claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "";
+        transaction.User_name = claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "";
+        transaction.Roles = claims.Where(c => c.Type == "scope").Select(c => c.Value).ToList();
+
+        transaction.JWTToken = headers["Authorization"].ToString().Replace("Bearer ", "");
+
         Transaction = transaction;
     }
 }

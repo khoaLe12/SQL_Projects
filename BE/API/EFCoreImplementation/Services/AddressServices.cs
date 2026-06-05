@@ -1,12 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
-using SQLAgent.EFCoreImplementation;
-using SQLAgent.Models.Entities;
+using API.EFCoreImplementation;
+using API.Models.Entities;
 using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace SQLAgent.EFCoreImplementation.Services;
+namespace API.EFCoreImplementation.Services;
 
 public interface IAddressServices
 {

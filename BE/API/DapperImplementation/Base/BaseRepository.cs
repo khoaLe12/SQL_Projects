@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.VisualBasic;
 using Newtonsoft.Json.Linq;
-using SQLAgent.Models.BaseModel;
-using SQLAgent.Models.SysEntities;
+using API.Models.BaseModel;
+using API.Models.SysEntities;
 using System;
 using System.Data;
 using System.Drawing;
@@ -15,7 +15,7 @@ using System.Runtime.CompilerServices;
 using static Dapper.SqlMapper;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace SQLAgent.DapperImplementation.Base;
+namespace API.DapperImplementation.Base;
 
 public interface IBaseRepository {
     SysDictionary? GetDictionaryInformation(string code_name, string schema_name, string table_name);

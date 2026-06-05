@@ -1,10 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SQLAgent.EFCoreImplementation;
-using SQLAgent.EFCoreImplementation.Repositories;
-using SQLAgent.EFCoreImplementation.Services;
+using API.EFCoreImplementation;
+using API.EFCoreImplementation.Repositories;
+using API.EFCoreImplementation.Services;
 using System;
 
-namespace SQLAgent.DependencyInjection;
+namespace API.DependencyInjection;
 
 public partial class DependencyInjection
 {

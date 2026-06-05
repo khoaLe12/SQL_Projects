@@ -1,7 +1,7 @@
 ﻿using Dapper;
 using System.Reflection;
 
-namespace SQLAgent.Models.BaseModel;
+namespace API.Models.BaseModel;
 
 public class EntityKey
 {

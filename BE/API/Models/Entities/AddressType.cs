@@ -1,8 +1,8 @@
-﻿using SQLAgent.Models.BaseModel;
+﻿using API.Models.BaseModel;
 using System;
 using System.Collections.Generic;
 
-namespace SQLAgent.Models.Entities;
+namespace API.Models.Entities;
 
 /// <summary>
 /// Types of addresses stored in the Address table. 

@@ -1,7 +1,7 @@
-﻿using SQLAgent.EFCoreImplementation;
-using SQLAgent.Models.Entities;
+﻿using API.EFCoreImplementation;
+using API.Models.Entities;
 
-namespace SQLAgent.EFCoreImplementation.Repositories;
+namespace API.EFCoreImplementation.Repositories;
 
 public partial interface IBusinessEntityAddressRepository : IBaseRepository<BusinessEntityAddress, object[]>
 {
