@@ -4,9 +4,9 @@
 -- 1. It is a built-in feature to track data changes made by DML operation.
 -- 2. The progress run asynchronously as background job by SQL Server Agent that reads transaction log to capture changes.
 -- 3. Provides a more effective and comprehensive solution compared to alternative manually implemented solutions.
---	+ Reduce development time
---	+ Improve performance of DML operation (since no additional actions are performed, like triggers, additional table insertion, additional query to get original data ...)
---	+ Run asynchronously 
+--	+ Reduce development time, useful for ETL operations, real-time reporting, and compliance auditing.
+--	+ Improve performance of DML operation (since no additional actions are performed like triggers, additional table insertion, additional query to get original data ...).
+--	+ Run asynchronously, reading changes from transaction log and does not interfere with the core application workload.
 -- 4. Offer many useful features:
 --	+ Built-in cleanup mechanism with retention-based cleanup policy that is performed automatically in the background
 --	+ The timeline of changes is based transaction commit time, ensure the reliable of changes order
@@ -135,6 +135,7 @@ BEGIN TRY
 	DECLARE @col_text Int = sys.fn_cdc_get_column_ordinal('Person_BusinessEntity', 'text');
 	
 	SELECT 
+		-- Get all changes for compliance auditing
 		sys.fn_cdc_map_lsn_to_time(__$start_lsn) AS [commit time],
 		__$start_lsn AS [LSN],
 		__$seqval,
@@ -146,6 +147,7 @@ BEGIN TRY
 			ELSE ''
 		END AS [operation],
 		ASCII(SUBSTRING(__$update_mask,1,1)) AS [bit masked],
+		__$update_mask AS [bit masked2],
 		BusinessEntityID,
 		rowguid,
 		ModifiedDate,
@@ -168,6 +170,7 @@ BEGIN TRY
 		END AS [is text updated]
 	FROM cdc.fn_cdc_get_all_changes_Person_BusinessEntity(@min_lsn, @max_lsn, 'all update old'); -- row filter options: all, all update old
 
+	-- Get net changes to perform ETL operations 
 	SELECT
 		sys.fn_cdc_map_lsn_to_time(__$start_lsn) AS [commit time],
 		CASE __$operation

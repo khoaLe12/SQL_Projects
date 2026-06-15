@@ -10,3 +10,42 @@ BEGIN
 	IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.sysCDCEnableTable') AND name = 'Idx_sysCDCEnableTable_TableName_CdcEnabled')
 		CREATE NONCLUSTERED INDEX Idx_sysCDCEnableTable_TableName_CdcEnabled ON [dbo].[sysCDCEnableTable](table_name, cdc_enabled)
 END
+
+IF NOT EXISTS (SELECT * FROM [dbo].[sysCDCEnableTable])
+BEGIN
+	--TRUNCATE TABLE [dbo].[sysCDCEnableTable]
+	INSERT INTO [dbo].[sysCDCEnableTable] (table_name, cdc_enabled, description)
+	VALUES('Person.Address', 1, ''),
+		  ('Person.BusinessEntity', 1, ''),
+		  ('Person.BusinessEntityAddress', 1, '')
+END
+
+EXEC sys.sp_cdc_enable_table
+	@source_schema = N'Person',
+	@source_name = N'Address',
+	@role_name = NULL,
+	@capture_instance = NULL,
+	@supports_net_changes = 1,
+	@index_name = NULL,
+	@captured_column_list = NULL,
+	@filegroup_name = NULL
+
+EXEC sys.sp_cdc_enable_table
+	@source_schema = N'Person',
+	@source_name = N'BusinessEntity',
+	@role_name = NULL,
+	@capture_instance = NULL,
+	@supports_net_changes = 1,
+	@index_name = NULL,
+	@captured_column_list = NULL,
+	@filegroup_name = NULL
+
+EXEC sys.sp_cdc_enable_table
+	@source_schema = N'Person',
+	@source_name = N'BusinessEntityAddress',
+	@role_name = NULL,
+	@capture_instance = NULL,
+	@supports_net_changes = 1,
+	@index_name = NULL,
+	@captured_column_list = NULL,
+	@filegroup_name = NULL

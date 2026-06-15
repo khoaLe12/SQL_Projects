@@ -140,7 +140,7 @@ GO
 -- 8. Restore in a sequence from full backup to differential backups
 -- Restore base
 RESTORE DATABASE [SQLTestDB] FROM DISK = 'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB.bak' WITH NORECOVERY;
--- Restore state of day 1
-RESTORE DATABASE [SQLTestDB] FROM DISK = 'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB_diff1.bak' WITH RECOVERY;
+-- Restore state of day 3
+RESTORE DATABASE [SQLTestDB] FROM DISK = 'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB_diff3.bak' WITH RECOVERY;
 -- Restore state of day 2
 RESTORE DATABASE [SQLTestDB] FROM DISK = 'D:\Projects\SQL-Projects\Notes\1. Backup and Restore\SQLTestDB_diff2.bak' WITH RECOVERY;

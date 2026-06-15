@@ -1,9 +1,17 @@
 *.mdf
 *.ldf
 
+Backup/
+Backup/*
+
 Notes/InMemoryDB_mod1/
-BE/SQLAgent/Logs
-BE/SQLAgent/bin
+Notes/InMemoryDB_mod1/*
+
+BE/SQLAgent/Logs/
+BE/SQLAgent/Logs/*
+
+BE/SQLAgent/bin/
+BE/SQLAgent/bin/*
 
 appsettings.json
 appsettings.Production.json

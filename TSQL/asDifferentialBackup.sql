@@ -1,43 +1,121 @@
- CREATE OR ALTER PROCEDURE [dbo].[asFullBackup]
-	@pIs_recovery Bit = 0,
+ CREATE OR ALTER PROCEDURE [dbo].[asDifferentialBackup]
 	@pRet Int OUTPUT
 AS	
 	SET NOCOUNT ON;
+	SET @pRet= 0;
 
-	IF @pIs_recovery IS NULL
-		SET @pIs_recovery = 0
-
-	SET @pRet = 0;
-
-	DECLARE @backup_path Nvarchar(512) = '',
+	BEGIN TRY
+		DECLARE @backup_path Nvarchar(512) = '',
 			@backup_name Nvarchar(100),
 			@db Nvarchar(128),
 			@paramDefinition Nvarchar(MAX),
 			@sql Nvarchar(MAX),
-			@stt Int,
-			@ref_backup_id Int,
+			@stt Int = 1,
+			@last_ref_backup_id Int = 0,
+			@ref_backup_id Int = 0,
+			@auto_chain_initial Bit = 0,
+			@root_level Hierarchyid = NULL,
 			@last_level Hierarchyid = NULL,
 			@next_level Hierarchyid = NULL,
 			@start_time Datetimeoffset = GETDATE();
-	DECLARE @inserted TABLE (id Int);
 
-	BEGIN TRY
+
+
+		SELECT TOP 1 
+			@backup_path = [location],
+			@auto_chain_initial = auto_chain_initial
+		FROM [dbo].[sysBackupConfig]
+		WHERE [type] = 'I'
+
+
+
+		-- Retrieve recent backup
 		SELECT TOP 1
-			@stt = stt,
-			@ref_backup_id = ref_backup_id,
-			@last_level = [level]
+			@ref_backup_id = id
 		FROM [dbo].[sysBackupHistory]
 		WHERE [type] = 'D'
+			AND [status] = '1'
+			AND recovery_backup = 0
 		ORDER BY [timestamp] DESC
 
-		SET @next_level = Hierarchyid::GetRoot().GetDescendant(@last_level, NULL);
+		SELECT TOP 1
+			@stt = stt,
+			@last_ref_backup_id = ref_backup_id,
+			@last_level = [level]
+		FROM [dbo].[sysBackupHistory]
+		WHERE [type] = 'I'
+		ORDER BY [timestamp] DESC
+
+		IF ISNULL(@ref_backup_id, 0) = 0
+		BEGIN
+			DECLARE @pResult Int = 1;
+
+			IF @auto_chain_initial = 1
+			BEGIN
+				EXEC [dbo].[asFullBackup] @pRet = @pResult OUTPUT
+				SET @start_time = GETDATE();
+			END
+
+			IF @pResult <> 0
+			BEGIN
+				INSERT INTO [dbo].[sysBackupHistory] (
+					[timestamp],
+					[type],
+					[status],
+					stt,
+					recovery_backup,
+					ref_backup_id,
+					[level],
+					[location],
+					[size_mb],
+					[error_message],
+					[duration_sec]
+				)
+				SELECT
+					@start_time,
+					'I',
+					'2',
+					@stt,
+					0,
+					@ref_backup_id,
+					'/',
+					'',
+					0,
+					'Backup chain is invalid',
+					0
+
+				SET @pRet = 1;
+
+				RETURN;
+			END
+
+			SELECT TOP 1
+				@ref_backup_id = id
+			FROM [dbo].[sysBackupHistory]
+			WHERE [type] = 'D'
+				AND [status] = '1'
+				AND recovery_backup = 0
+			ORDER BY [timestamp] DESC
+		END
+
+		IF @last_ref_backup_id <> @ref_backup_id
+		BEGIN
+			SET @stt = 0;
+			SET @last_level = NULL
+		END
+
+		SELECT TOP 1
+			@root_level = [level]
+		FROM [dbo].[sysBackupHistory]
+		WHERE id = @ref_backup_id
+			AND [type] = 'D'
+
+		SET @next_level = @root_level.GetDescendant(@last_level, NULL);
 
 
-		-- Construct backup file path
-		SELECT TOP 1 
-			@backup_path = [location]
-		FROM [dbo].[sysBackupConfig]
-		WHERE [type] = 'D'
+
+		-- Execute backup
+		SET @stt = ISNULL(@stt, 0) + 1
 
 		IF @backup_path IS NULL OR @backup_path = ''
 		BEGIN
@@ -50,21 +128,20 @@ AS
 					N'BackupDirectory',
 					@backup_path OUTPUT;
 		END
+		SET @backup_path = @backup_path + '\' + DB_NAME() + '_DifferentialBackup_' + TRIM(CAST(@stt AS NVARCHAR(10))) + '.bak'
 
-		SET @backup_path = @backup_path + '\' + DB_NAME() + '_FullBackup_' + CASE @pIs_recovery WHEN 1 THEN '_Recovery_' ELSE '' END + FORMAT(GETDATE(), 'yyyyMMdd') + '.bak'
+		SET @backup_name = N'DifferentialBackup ' + CAST(NEWID() AS Nvarchar(36))
 
-
-
-		-- Execute backup
-		SET @stt = ISNULL(@stt, 0) + 1
-		SET @backup_name = N'FullBackup ' + CAST(NEWID() AS Nvarchar(36))
  		SET @db = DB_NAME()
+
 		SET @paramDefinition = N'@file_path Nvarchar(255), @db Nvarchar(128), @backup_name Nvarchar(100)'
+
 		SET @sql = '
 			USE [master];
 			BACKUP DATABASE @db
 			TO DISK = @file_path
 				WITH
+					DIFFERENTIAL,
 					SKIP,
 					NOREWIND,
 					FORMAT,
@@ -72,6 +149,7 @@ AS
 					NAME = @backup_name, 
 					STATS = 50;
 		'
+
 		EXEC sp_executesql 
 			@sql,
 			@paramDefinition,
@@ -101,7 +179,7 @@ AS
 		INTO #temp
 		FROM msdb.dbo.backupset bs
 		INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.media_set_id = bs.media_set_id
-		WHERE bs.type = 'D' AND bs.database_name = DB_NAME() AND bs.name = @backup_name AND bmf.physical_device_name = @backup_path
+		WHERE bs.type = 'I' AND bs.database_name = DB_NAME() AND bs.name = @backup_name AND bmf.physical_device_name = @backup_path
 
 		IF EXISTS (SELECT * FROM #temp)
 		BEGIN
@@ -118,14 +196,13 @@ AS
 				[error_message],
 				[duration_sec]
 			)
-			OUTPUT INSERTED.id INTO @inserted(id)
 			SELECT
 				@start_time,
-				'D',
+				'I',
 				'1',
 				@stt,
-				@pIs_recovery,
-				'',
+				0,
+				@ref_backup_id,
 				@next_level,
 				physical_device_name,
 				backup_size_mb,
@@ -148,20 +225,18 @@ AS
 				[error_message],
 				[duration_sec]
 			)
-			OUTPUT INSERTED.id INTO @inserted(id)
 			SELECT
 				@start_time,
-				'D',
+				'I',
 				'2',
 				@stt,
-				@pIs_recovery,
-				'',
+				0,
+				@ref_backup_id,
 				@next_level,
 				'',
 				0,
 				'Backup set not found',
 				0
-
 
 			SET @pRet = 1;
 		END
@@ -180,14 +255,13 @@ AS
 			[error_message],
 			[duration_sec]
 		)
-		OUTPUT INSERTED.id INTO @inserted(id)
 		SELECT
 			@start_time,
-			'D',
+			'I',
 			'2',
 			@stt,
-			@pIs_recovery,
-			'',
+			0,
+			@ref_backup_id,
 			@next_level,
 			'',
 			0,
@@ -198,8 +272,6 @@ AS
 	END CATCH
 
 	IF @pRet = 0 SET @pRet = @@ERROR
-
-	IF @pIs_recovery = 1 SELECT * FROM @inserted
 
 	IF OBJECT_ID('tempdb..#temp') IS NOT NULL
 			DROP TABLE #temp

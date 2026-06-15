@@ -1,4 +1,4 @@
--- Use Hierarchyid as a data type to create tables with a hierarchicak structure
+-- Use Hierarchyid as a data type to create tables with a hierarchical structure
 -- Key properties: Extremely compact, Comparison is in depth-first order, Support for arbitrary insertions and deletions
 USE AdventureWorks2025;
 GO
