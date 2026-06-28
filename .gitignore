@@ -2,14 +2,12 @@
 *.ldf
 
 Backup/
-Backup/*
 
 Notes/InMemoryDB_mod1/
-Notes/InMemoryDB_mod1/*
 
 BE/.vs/
 
-BE/API/Logs/
+BE/API/Logs/*
 BE/API/apikey
 BE/API/jwt.key
 BE/API/key
