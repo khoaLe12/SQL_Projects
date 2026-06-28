@@ -1,7 +1,7 @@
 ﻿using Dapper;
 using Newtonsoft.Json.Linq;
 using API.Models.SysEntities;
-using API.Utilities;
+using API.Common;
 
 namespace API.DapperImplementation.Base;
 
@@ -16,7 +16,7 @@ public interface IBaseService
 
 public class BaseService : IBaseService
 {
-    private readonly IUnitOfWork _unitOfWork;
+    protected readonly IUnitOfWork _unitOfWork;
 
     public BaseService(IUnitOfWork unitOfWork)
     {
@@ -166,7 +166,7 @@ public class BaseService : IBaseService
         catch (Exception ex)
         {
             _unitOfWork.RollbackTrans();
-            Utilities.Utilities.Log(ex);
+            Common.Utilities.Log(ex);
             throw;
         }
     }

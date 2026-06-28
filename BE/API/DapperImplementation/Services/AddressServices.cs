@@ -4,7 +4,7 @@ using API.DapperImplementation.Repositories;
 
 namespace API.DapperImplementation.Services;
 
-public interface IAddressServices
+public interface IAddressServices : IBaseService
 {
     IEnumerable<dynamic> ExecuteGet(JObject search);
     int ExecuteInsert(JObject data);
@@ -12,13 +12,10 @@ public interface IAddressServices
     int ExecuteDelete(int addressId);
 }
 
-public class AddressServices : IAddressServices
+public class AddressServices : BaseService, IAddressServices
 {
-    private readonly IUnitOfWork _unitOfWork;
-
-    public AddressServices(IUnitOfWork unitOfWork)
+    public AddressServices(IUnitOfWork unitOfWork) : base(unitOfWork)
     {
-        _unitOfWork = unitOfWork;
     }
 
     public IEnumerable<dynamic> ExecuteGet(JObject search)

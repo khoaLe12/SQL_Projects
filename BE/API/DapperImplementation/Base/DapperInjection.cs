@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace API.DependencyInjection;
 
-public partial class DependencyInjection
+public static partial class DependencyInjection
 {
     public static IServiceCollection AddDapperDependencies(this IServiceCollection services, IConfiguration configuration)
     {
@@ -14,27 +14,13 @@ public partial class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IBaseRepository, BaseRepository>();
         services.AddScoped<IBaseService, BaseService>();
+        services.AddScoped<IHomeRepository, HomeRepository>();
+        services.AddScoped<IHomeServices, HomeServices>();
 
         services.AddScoped<IAddressRepository, AddressRepository>();
         services.AddScoped<IAddressServices, AddressServices>();
 
         services.AddScoped<IBusinessEntityAddressRepository, BusinessEntityAddressRepository>();
-
-        Type type = typeof(DependencyInjection);
-        MethodInfo[] methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-        foreach (var method in methods)
-        {
-            if (method.IsSpecialName || method.Name == nameof(AddDapperDependencies)) continue;
-
-            if (method.GetParameters().Length == 2 && method.GetParameters()[0].ParameterType == typeof(IServiceCollection) && method.GetParameters()[1].ParameterType == typeof(IConfiguration))
-            {
-                method.Invoke(null, new object[] { services, configuration });
-            }
-            if (method.GetParameters().Length == 1 && method.GetParameters()[0].ParameterType == typeof(IServiceCollection))
-            {
-                method.Invoke(null, new object[] { services });
-            }
-        }
 
         return services;
     }

@@ -1,4 +1,8 @@
- CREATE OR ALTER PROCEDURE [dbo].[asLogBackup]
+USE [AdventureWorks2025_backup]
+GO
+
+CREATE OR ALTER PROCEDURE [dbo].[asLogBackup]
+	@pDb_name Nvarchar(128),
 	@pRet Int OUTPUT
 AS	
 	SET NOCOUNT ON;
@@ -11,6 +15,7 @@ AS
 			@paramDefinition Nvarchar(MAX),
 			@sql Nvarchar(MAX),
 			@stt Int = 1,
+			@stt_ref Int = 1,
 			@last_ref_backup_id Int = 0,
 			@ref_backup_id Int = 0,
 			@last_full_backup Int = 0,
@@ -32,7 +37,8 @@ AS
 		-- Retrieve recent backup
 		SELECT TOP 1
 			@ref_backup_id = id,
-			@ref_full_backup = ref_backup_id
+			@ref_full_backup = ref_backup_id,
+			@stt_ref = stt
 		FROM [dbo].[sysBackupHistory]
 		WHERE [type] = 'I'
 			AND [status] = '1'
@@ -60,7 +66,7 @@ AS
 
 			IF @auto_chain_initial = 1
 			BEGIN
-				EXEC [dbo].[asDifferentialBackup] @pResult OUTPUT
+				EXEC [dbo].[asDifferentialBackup] @pDb_name, @pResult OUTPUT
 				SET @start_time = GETDATE();
 			END
 
@@ -99,7 +105,8 @@ AS
 
 			SELECT TOP 1
 				@ref_backup_id = id,
-				@ref_full_backup = ref_backup_id
+				@ref_full_backup = ref_backup_id,
+				@stt_ref = stt
 			FROM [dbo].[sysBackupHistory]
 			WHERE [type] = 'I'
 				AND [status] = '1'
@@ -136,18 +143,19 @@ AS
 					N'BackupDirectory',
 					@backup_path OUTPUT;
 		END
-		SET @backup_path = @backup_path + '\' + DB_NAME() + '_LogBackup_' + TRIM(CAST(@stt AS NVARCHAR(10))) + '.bak'
+		SET @backup_path = @backup_path + '\' + @pDb_name + '_LogBackup_' + TRIM(CAST(@stt_ref AS Nvarchar)) + '_' + TRIM(CAST(@stt AS NVARCHAR(10))) + '.bak'
 
 		SET @backup_name = N'LogBackup ' + CAST(NEWID() AS Nvarchar(36))
 
- 		SET @db = DB_NAME()
+ 		SET @db = @pDb_name
 
 		SET @paramDefinition = N'@file_path Nvarchar(255), @db Nvarchar(128), @backup_name Nvarchar(100)'
 		SET @sql = '
-			USE [master];
 			BACKUP LOG @db
 			TO DISK = @file_path
 				WITH
+					INIT,
+					FORMAT,
 					MEDIANAME = ''SQLProjectBackups'',
 					NAME = @backup_name
 		'
@@ -181,7 +189,7 @@ AS
 		INTO #temp
 		FROM msdb.dbo.backupset bs
 		INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.media_set_id = bs.media_set_id
-		WHERE bs.type = 'L' AND bs.database_name = DB_NAME() AND bs.name = @backup_name AND bmf.physical_device_name = @backup_path
+		WHERE bs.type = 'L' AND bs.database_name = @pDb_name AND bs.name = @backup_name AND bmf.physical_device_name = @backup_path
 
 		IF EXISTS (SELECT * FROM #temp)
 		BEGIN

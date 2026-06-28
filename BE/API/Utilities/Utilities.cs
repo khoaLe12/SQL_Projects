@@ -1,12 +1,21 @@
-﻿using System.Text;
+﻿using Microsoft.AspNetCore.Cryptography.KeyDerivation;
+using System.Security.Cryptography;
+using System.Text;
 
-namespace API.Utilities;
+namespace API.Common;
 
 public static class Utilities
 {
+    private static byte[] salt = new byte[0];
+
+    public static void Initialize(IConfiguration config)
+    {
+        salt = Encoding.UTF8.GetBytes((string?)config.GetValue(typeof(string), "Salt") ?? throw new ArgumentNullException("Salt not found"));
+    }
+
     public static void Log(Exception ex)
     {
-        string filename = DateTime.Now.ToString("dd-MM-yyyy") + ".txt";
+        string filename = DateTime.Now.ToString("yyyy-MM-dd") + ".txt";
         string contentRoot = Environment.CurrentDirectory;
         string logFile = Path.Combine(contentRoot, "Logs\\", filename);
         if (!File.Exists(logFile))
@@ -26,5 +35,27 @@ public static class Utilities
                 ex.ToString() 
             });
         }
+    }
+
+    public static string HashPassword(string password, int iterations = 100000)
+    {
+        // derive a 128-bit subkey (use HMACSHA256 with 100,000 iterations)
+        byte[] array = KeyDerivation.Pbkdf2(
+                password: password,
+                salt: salt,
+                prf: KeyDerivationPrf.HMACSHA256,
+                iterations,
+                128 / 8
+        );
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < array.Length; i++)
+        {
+            byte b = array[i];
+            sb.Append(b.ToString("x2").ToUpper() + "-");
+        }
+        sb = sb.Remove(sb.Length - 1, 1);
+
+        return sb.ToString();
     }
 }

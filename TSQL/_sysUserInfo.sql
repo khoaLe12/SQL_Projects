@@ -1,6 +1,6 @@
-IF OBJECT_ID('sysUserInfo', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.sysUserInfo', 'U') IS NULL
 BEGIN
-	CREATE TABLE sysUserInfo (
+	CREATE TABLE [dbo].[sysUserInfo] (
 		id Nvarchar(50) NOT NULL DEFAULT '',
 		username Nvarchar(20) NOT NULL DEFAULT '',
 		password Nvarchar(100) NOT NULL DEFAULT '',

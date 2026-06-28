@@ -2,7 +2,7 @@
 using System;
 using System.Text;
 
-namespace API.Utilities;
+namespace API.Common;
 
 public static class ErrorsCatalog
 {

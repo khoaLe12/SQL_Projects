@@ -220,7 +220,7 @@ public class EntityRepository<T, TKeys> : BaseRepository, IEntityRepository<T, T
     public EntityRepository(AdventureWorks2025Connection connection, string schema) : base (connection)
     {
         _schema = schema;
-        
+
         // Check schema existence
         DynamicParameters parameters = new DynamicParameters();
         parameters.Add("Schema_name", schema);
@@ -232,7 +232,7 @@ public class EntityRepository<T, TKeys> : BaseRepository, IEntityRepository<T, T
         }
 
         // Retrieve system information
-        var sysDictionary = GetDictionaryInformation("", _schema, nameof(T));
+        var sysDictionary = GetDictionaryInformation("", _schema, typeof(T).Name);
         if (sysDictionary is null)
         {
             throw new BaseADORepoException($"Table information is not declared, {nameof(sysDictionary)}");

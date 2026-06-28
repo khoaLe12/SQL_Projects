@@ -4,11 +4,11 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
-namespace API.Utilities;
+namespace API.Common;
 
 public interface IJwtTokenProvider
 {
-    string CreateSecurityToken(sysUserInfo user, List<sysUserPrivileges> privileges);
+    string CreateSecurityToken(sysUserInfo user, List<sysUserPrivilege> privileges);
     TransactionInformation? VerifySecurityToken(string token);
 }
 
@@ -23,21 +23,21 @@ public class JwtTokenProvider : IJwtTokenProvider
         _configuration = configuration;
     }
 
-    public string CreateSecurityToken (sysUserInfo user, List<sysUserPrivileges> privileges)
+    public string CreateSecurityToken (sysUserInfo user, List<sysUserPrivilege> privileges)
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.id.ToString()),
-            new Claim(ClaimTypes.Name, user.username)
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Username)
         };
 
         if (privileges.Count() > 0)
         {
             foreach(var privilege in privileges)
             {
-                if (privilege is not null && !string.IsNullOrEmpty(privilege.action_code) && !string.IsNullOrEmpty(privilege.scope))
+                if (privilege is not null && !string.IsNullOrEmpty(privilege.Action_code) && !string.IsNullOrEmpty(privilege.Scope))
                 {
-                    claims.Add(new Claim("scope", $"{privilege.action_code}:{privilege.scope}"));
+                    claims.Add(new Claim("scope", $"{privilege.Scope}:{privilege.Action_code}"));
                 }
             }
         }
@@ -56,6 +56,8 @@ public class JwtTokenProvider : IJwtTokenProvider
     }
     public TransactionInformation? VerifySecurityToken(string token)
     {
+        if (string.IsNullOrEmpty(token)) return null;
+
         var validationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -78,8 +80,20 @@ public class JwtTokenProvider : IJwtTokenProvider
             transaction.User_id = jwt.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "";
             transaction.User_name = jwt.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "";
             transaction.Roles = jwt.Claims.Where(c => c.Type == "scope").Select(c => c.Value).ToList();
-            transaction.JWTToken = jwt.ToString();
+            transaction.JWTToken = token;
             transaction.ExpireAt = jwt.ValidTo;
+
+            List<sysUserPrivilege> sysUserPrivileges = new List<sysUserPrivilege>();
+            foreach (var role in transaction.Roles)
+            {
+                string[] parts = role.Split(":");
+                if (parts.Length == 2)
+                {
+                    sysUserPrivilege sysUserPrivilege = new sysUserPrivilege("", transaction.User_id, parts[0], parts[1]);
+                    sysUserPrivileges.Add(sysUserPrivilege);
+                }
+            }
+            transaction.sysUserPrivileges = sysUserPrivileges;
 
             return transaction;
         }

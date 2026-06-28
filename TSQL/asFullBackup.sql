@@ -1,6 +1,11 @@
- CREATE OR ALTER PROCEDURE [dbo].[asFullBackup]
+USE [AdventureWorks2025_backup]
+GO
+
+CREATE OR ALTER PROCEDURE [dbo].[asFullBackup]
+	@pDb_name Nvarchar(128),
 	@pIs_recovery Bit = 0,
-	@pRet Int OUTPUT
+	@pRet Int OUTPUT,
+	@pRecovery_id Int OUTPUT
 AS	
 	SET NOCOUNT ON;
 
@@ -51,17 +56,16 @@ AS
 					@backup_path OUTPUT;
 		END
 
-		SET @backup_path = @backup_path + '\' + DB_NAME() + '_FullBackup_' + CASE @pIs_recovery WHEN 1 THEN '_Recovery_' ELSE '' END + FORMAT(GETDATE(), 'yyyyMMdd') + '.bak'
+		SET @backup_path = @backup_path + '\' + @pDb_name + '_FullBackup_' + CASE @pIs_recovery WHEN 1 THEN '_Recovery_' ELSE '' END + FORMAT(GETDATE(), 'yyyyMMdd') + '.bak'
 
 
 
 		-- Execute backup
 		SET @stt = ISNULL(@stt, 0) + 1
 		SET @backup_name = N'FullBackup ' + CAST(NEWID() AS Nvarchar(36))
- 		SET @db = DB_NAME()
+ 		SET @db = @pDb_name
 		SET @paramDefinition = N'@file_path Nvarchar(255), @db Nvarchar(128), @backup_name Nvarchar(100)'
 		SET @sql = '
-			USE [master];
 			BACKUP DATABASE @db
 			TO DISK = @file_path
 				WITH
@@ -101,7 +105,7 @@ AS
 		INTO #temp
 		FROM msdb.dbo.backupset bs
 		INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.media_set_id = bs.media_set_id
-		WHERE bs.type = 'D' AND bs.database_name = DB_NAME() AND bs.name = @backup_name AND bmf.physical_device_name = @backup_path
+		WHERE bs.type = 'D' AND bs.database_name = @pDb_name AND bs.name = @backup_name AND bmf.physical_device_name = @backup_path
 
 		IF EXISTS (SELECT * FROM #temp)
 		BEGIN
@@ -199,7 +203,8 @@ AS
 
 	IF @pRet = 0 SET @pRet = @@ERROR
 
-	IF @pIs_recovery = 1 SELECT * FROM @inserted
+	-- IF @pIs_recovery = 1 SELECT * FROM @inserted
+	SELECT TOP 1 @pRecovery_id = id FROM @inserted
 
 	IF OBJECT_ID('tempdb..#temp') IS NOT NULL
 			DROP TABLE #temp

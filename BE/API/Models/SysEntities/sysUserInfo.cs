@@ -2,14 +2,14 @@
 
 public class sysUserInfo
 {
-    public string id { get; set; }
-    public string username { get; set; }
-    public string password { get; set; }
+    public string Id { get; set; }
+    public string Username { get; set; }
+    public string Password { get; set; }
 
     public sysUserInfo(string id, string username, string password)
     {
-        this.id = id;
-        this.username = username;
-        this.password = password;
+        this.Id = id;
+        this.Username = username;
+        this.Password = password;
     }
 }

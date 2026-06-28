@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Newtonsoft.Json.Linq;
 using API.EFCoreImplementation.Services;
 using API.Models.Entities;
-using API.Utilities;
+using API.Common;
 using System.Net;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860

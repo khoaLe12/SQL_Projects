@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using API.Utilities;
+using API.Common;
 using System.Net;
 
 namespace API;
@@ -22,7 +22,7 @@ public class GlobalExceptionMiddleware
         }
         catch (Exception ex)
         {
-            Utilities.Utilities.Log(ex);
+            Common.Utilities.Log(ex);
             await HandleExceptionAsync(httpContext, ex);
         }
     }

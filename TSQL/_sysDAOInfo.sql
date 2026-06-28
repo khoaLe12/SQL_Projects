@@ -17,6 +17,7 @@ END
 
 IF NOT EXISTS (SELECT * FROM [dbo].[sysDAOInfo] WHERE code_name = 'ADDRESS_CODE')
 BEGIN
-	INSERT INTO [dbo].[sysDAOInfo] (id, code_name, sp_get, sp_ins, sp_upd, sp_del)
-	VALUES (NEWID(), 'ADDRESS_CODE', 'asAddressGet', 'asAddressIns', 'asAddressUpd', 'asAddressDel')
+	--DELETE [dbo].[sysDAOInfo] WHERE code_name = 'ADDRESS_CODE'
+	INSERT INTO [dbo].[sysDAOInfo] (id, code_name, sp_schema, sp_get, sp_ins, sp_upd, sp_del)
+	VALUES (NEWID(), 'ADDRESS_CODE', 'dbo', 'asAddressGet', 'asAddressIns', 'asAddressUpd', 'asAddressDel')
 END

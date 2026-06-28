@@ -1,4 +1,4 @@
-﻿namespace API.Utilities;
+﻿namespace API.Common;
 
 public class ApiResult
 {

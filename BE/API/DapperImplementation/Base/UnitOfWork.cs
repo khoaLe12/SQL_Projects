@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using API.Models;
-using API.Utilities;
+using API.Common;
 using System;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
@@ -48,7 +48,7 @@ public sealed class UnitOfWork : IUnitOfWork
         }
         catch (Exception ex)
         {
-            Utilities.Utilities.Log(ex);
+            Common.Utilities.Log(ex);
             throw;
         }
     }

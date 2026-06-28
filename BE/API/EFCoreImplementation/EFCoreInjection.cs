@@ -6,7 +6,7 @@ using System;
 
 namespace API.DependencyInjection;
 
-public partial class DependencyInjection
+public static partial class DependencyInjection
 {
     public static IServiceCollection AddEFCoreDependencies(this IServiceCollection services, IConfiguration configuration)
     {

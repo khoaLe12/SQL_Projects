@@ -1,17 +1,32 @@
-﻿
-using Microsoft.OpenApi;
-using API;
+﻿using API;
+using API.Common;
 using API.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
+using Swashbuckle.AspNetCore.SwaggerGen;
+using System.Reflection;
 
 
 
 var builder = WebApplication.CreateBuilder(args);
 var Configuration = builder.Configuration;
 
+Utilities.Initialize(Configuration);
+
 // Add services to the container.
-builder.Services.AddEFCoreDependencies(Configuration);
-builder.Services.AddDapperDependencies(Configuration);
-builder.Services.AddCoreDependencies();
+Type type = typeof(DependencyInjection);
+MethodInfo[] methods = type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly);
+foreach (var method in methods)
+{
+    if (method.GetParameters().Length == 2 && method.GetParameters()[0].ParameterType == typeof(IServiceCollection) && method.GetParameters()[1].ParameterType == typeof(IConfiguration))
+    {
+        method.Invoke(null, new object[] { builder.Services, Configuration });
+    }
+    if (method.GetParameters().Length == 1 && method.GetParameters()[0].ParameterType == typeof(IServiceCollection))
+    {
+        method.Invoke(null, new object[] { builder.Services });
+    }
+}
 
 builder.Services.AddMvc();
 builder.Services.AddControllers(options => { })
@@ -61,6 +76,18 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Base.API v1"));
+
+    app.Use(async (context, next) =>
+    {
+        try
+        {
+            await next();
+        }
+        catch (Exception ex)
+        {
+            Utilities.Log(ex);
+        }
+    });
 }
 
 app.UseHttpsRedirection();

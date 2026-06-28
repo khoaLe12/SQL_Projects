@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Newtonsoft.Json.Linq;
 using API.EFCoreImplementation;
-using API.Utilities;
+using API.Common;
 using System;
 using System.Collections;
 using System.Collections.Immutable;
@@ -139,7 +139,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
         }
         catch (Exception ex)
         {
-            Utilities.Utilities.Log(ex);
+            Common.Utilities.Log(ex);
             if (dbCommand is not null) dbCommand.Dispose();
             if (_connection.State == ConnectionState.Open) _connection.Close();
             throw;
@@ -223,7 +223,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
         }
         catch (Exception ex)
         {
-            Utilities.Utilities.Log(ex);
+            Common.Utilities.Log(ex);
             if (dbCommand is not null) dbCommand.Dispose();
             if (_connection.State == ConnectionState.Open) _connection.Close();
             throw;
@@ -313,7 +313,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
         }
         catch (Exception ex)
         {
-            Utilities.Utilities.Log(ex);
+            Common.Utilities.Log(ex);
             if (dbCommand is not null) dbCommand.Dispose();
             if (_connection.State == ConnectionState.Open) _connection.Close();
             throw;
@@ -376,7 +376,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
         }
         catch (Exception ex)
         {
-            Utilities.Utilities.Log(ex);
+            Common.Utilities.Log(ex);
             if (dbCommand is not null) dbCommand.Dispose();
             if (_connection.State == ConnectionState.Open) _connection.Close();
             throw;
@@ -472,7 +472,7 @@ public class BaseRepository<T, TKeys> : IBaseRepository<T, TKeys> where T : Base
         }
         catch (Exception ex)
         {
-            Utilities.Utilities.Log(ex);
+            Common.Utilities.Log(ex);
             if (transaction is not null) transaction.Rollback();
             if (dbCommand is not null) dbCommand.Dispose();
             if (_connection.State == ConnectionState.Open) _connection.Close();

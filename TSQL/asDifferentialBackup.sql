@@ -1,4 +1,8 @@
- CREATE OR ALTER PROCEDURE [dbo].[asDifferentialBackup]
+USE [AdventureWorks2025_backup]
+GO
+
+CREATE OR ALTER PROCEDURE [dbo].[asDifferentialBackup]
+	@pDb_name Nvarchar(128),
 	@pRet Int OUTPUT
 AS	
 	SET NOCOUNT ON;
@@ -48,11 +52,12 @@ AS
 
 		IF ISNULL(@ref_backup_id, 0) = 0
 		BEGIN
-			DECLARE @pResult Int = 1;
+			DECLARE @pResult Int = 1,
+				@pRecovery_id Int = 0
 
 			IF @auto_chain_initial = 1
 			BEGIN
-				EXEC [dbo].[asFullBackup] @pRet = @pResult OUTPUT
+				EXEC [dbo].[asFullBackup] @pDb_name, @pRet = @pResult OUTPUT, @pRecovery_id = @pRecovery_id OUTPUT
 				SET @start_time = GETDATE();
 			END
 
@@ -128,20 +133,20 @@ AS
 					N'BackupDirectory',
 					@backup_path OUTPUT;
 		END
-		SET @backup_path = @backup_path + '\' + DB_NAME() + '_DifferentialBackup_' + TRIM(CAST(@stt AS NVARCHAR(10))) + '.bak'
+		SET @backup_path = @backup_path + '\' + @pDb_name + '_DifferentialBackup_' + TRIM(CAST(@stt AS NVARCHAR(10))) + '.bak'
 
 		SET @backup_name = N'DifferentialBackup ' + CAST(NEWID() AS Nvarchar(36))
 
- 		SET @db = DB_NAME()
+ 		SET @db = @pDb_name
 
 		SET @paramDefinition = N'@file_path Nvarchar(255), @db Nvarchar(128), @backup_name Nvarchar(100)'
 
 		SET @sql = '
-			USE [master];
 			BACKUP DATABASE @db
 			TO DISK = @file_path
 				WITH
 					DIFFERENTIAL,
+					INIT,
 					SKIP,
 					NOREWIND,
 					FORMAT,
@@ -179,7 +184,7 @@ AS
 		INTO #temp
 		FROM msdb.dbo.backupset bs
 		INNER JOIN msdb.dbo.backupmediafamily bmf ON bmf.media_set_id = bs.media_set_id
-		WHERE bs.type = 'I' AND bs.database_name = DB_NAME() AND bs.name = @backup_name AND bmf.physical_device_name = @backup_path
+		WHERE bs.type = 'I' AND bs.database_name = @pDb_name AND bs.name = @backup_name AND bmf.physical_device_name = @backup_path
 
 		IF EXISTS (SELECT * FROM #temp)
 		BEGIN

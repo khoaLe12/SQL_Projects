@@ -1,3 +1,6 @@
+USE [AdventureWorks2025_backup]
+GO
+
 IF OBJECT_ID('dbo.sysBackupConfig', 'U') IS NULL
 BEGIN
 	CREATE TABLE [dbo].[sysBackupConfig] (

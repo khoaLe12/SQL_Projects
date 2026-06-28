@@ -7,11 +7,19 @@ Backup/*
 Notes/InMemoryDB_mod1/
 Notes/InMemoryDB_mod1/*
 
-BE/SQLAgent/Logs/
-BE/SQLAgent/Logs/*
+BE/.vs/
 
+BE/API/Logs/
+BE/API/apikey
+BE/API/jwt.key
+BE/API/key
+BE/API/salt
+
+BE/API/obj/
+BE/API/bin/
+
+BE/SQLAgent/obj/
 BE/SQLAgent/bin/
-BE/SQLAgent/bin/*
 
 appsettings.json
 appsettings.Production.json
