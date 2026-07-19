@@ -1,4 +1,7 @@
-﻿namespace API.Common;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+
+namespace API.Common;
 
 public class ApiResult
 {

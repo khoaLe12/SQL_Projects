@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using API.Models.SysEntities;
 using API.Common;
+using API.Services;
 
 namespace API.DapperImplementation.Base;
 
@@ -17,237 +18,156 @@ public interface IBaseService
 public class BaseService : IBaseService
 {
     protected readonly IUnitOfWork _unitOfWork;
+    protected readonly IParameterBuilder _parameterBuilder;
+    protected readonly IResultMapper _resultMapper;
 
-    public BaseService(IUnitOfWork unitOfWork)
+    public BaseService(IUnitOfWork unitOfWork, IParameterBuilder parameterBuilder,
+        IResultMapper resultMapper)
     {
-        _unitOfWork = unitOfWork;
+        _unitOfWork = unitOfWork ?? throw new BaseADOServiceException(11);
+        _parameterBuilder = parameterBuilder ?? throw new BaseADOServiceException(12);
+        _resultMapper = resultMapper ?? throw new BaseADOServiceException(13);
     }
 
-    public ApiResult ExecuteGet(string code_name, JObject search)
+    public virtual ApiResult ExecuteGet(string code_name, JObject search)
     {
-        ApiResult apiResult = new ApiResult();
-
         IBaseRepository repository = _unitOfWork.Repository(typeof(IBaseRepository));
         sysDAOInfo? sysDAOInfo = repository.GetDAOInformation(code_name);
         if (sysDAOInfo is null)
         {
-            apiResult.Message = "Get failed";
-            apiResult.StatusCode = "10000";
-            return apiResult;
+            throw new BaseADOServiceException(1);
         }
 
-        DynamicParameters parameters = new DynamicParameters();
-        foreach (JProperty property in search.Properties())
-        {
-            if (property.Type == JTokenType.Date)
-            {
-                parameters.Add(property.Name, property.Value.Value<DateTime>());
-            }
-            else
-            {
-                parameters.Add(property.Name, property.Value.ToString());
-            }
-        }
+        // Delegate parameter building to specialized service
+        DynamicParameters parameters = _parameterBuilder.Build(search);
 
-        var result = repository.ExecuteQuery(sysDAOInfo.sp_get, ref parameters);
-        apiResult.Data = result;
-        apiResult.StatusCode = "00000";
-        apiResult.Message = "Get successful";
-        return apiResult;
+        // Execute query
+        var result = repository.ExecuteQuery(sysDAOInfo.sp_schema, sysDAOInfo.sp_get, ref parameters);
+
+        // Delegate result mapping to specialized service
+        return _resultMapper.MapQueryResult(result, "Get operation successful");
     }
-    public ApiResult ExecuteInsert(string code_name, JObject insert)
+    public virtual ApiResult ExecuteInsert(string code_name, JObject insert)
     {
-        ApiResult apiResult = new ApiResult();
-
         IBaseRepository repository = _unitOfWork.Repository(typeof(IBaseRepository));
         sysDAOInfo? sysDAOInfo = repository.GetDAOInformation(code_name);
         if (sysDAOInfo is null)
         {
-            apiResult.Message = "Insert failed";
-            apiResult.StatusCode = "10000";
-            return apiResult;
-        }
-        DynamicParameters parameters = new DynamicParameters();
-        foreach (JProperty property in insert.Properties())
-        {
-            if (property.Type == JTokenType.Date)
-            {
-                parameters.Add(property.Name, property.Value.Value<DateTime>());
-            }
-            else
-            {
-                parameters.Add(property.Name, property.Value.ToString());
-            }
+            throw new BaseADOServiceException(1);
         }
 
-        dynamic? keys = repository.ExecuteQuerySingle(sysDAOInfo.sp_ins, ref parameters);
-        int resultInt = parameters.Get<int>("@pRet");
-        if (resultInt != 0)
-        {
-            apiResult.StatusCode = "10000";
-            apiResult.Data = resultInt.ToString();
-            apiResult.Message = "Insert failed";
-            return apiResult;
-        }
+        // Delegate parameter building to specialized service
+        DynamicParameters parameters = _parameterBuilder.Build(insert);
+        //_parameterBuilder.AddReturnParameter(parameters);
 
-        if (keys is not null)
-        {
-            IDictionary<string, object> keyMaps = (IDictionary<string, object>)keys;
-            foreach (var key in keyMaps)
-            {
-                insert[key.Key] = JToken.FromObject(key.Value ?? "");
-            }
-        }
+        // Execute insert stored procedure
+        dynamic? keys = repository.ExecuteQuerySingle(sysDAOInfo.sp_schema, sysDAOInfo.sp_ins, ref parameters);
+        int resultCode = parameters.Get<int>("@pRet");
 
-        apiResult.Data = insert;
-        apiResult.StatusCode = "00000";
-        apiResult.Message = "Insert successful";
-        return apiResult;
+        // Delegate result mapping to specialized service
+        return _resultMapper.MapInsertResult(insert, keys, resultCode);
     }
-    public ApiResult ExecuteInsertArray(string code_name, JArray inserts)
+    public virtual ApiResult ExecuteInsertArray(string code_name, JArray inserts)
     {
-        try
+        IBaseRepository repository = _unitOfWork.Repository(typeof(IBaseRepository));
+        sysDAOInfo? sysDAOInfo = repository.GetDAOInformation(code_name);
+        if (sysDAOInfo is null)
         {
-            ApiResult apiResult = new ApiResult();
-            IBaseRepository repository = _unitOfWork.Repository(typeof(IBaseRepository));
-            sysDAOInfo? sysDAOInfo = repository.GetDAOInformation(code_name);
-            if (sysDAOInfo is null)
+            throw new BaseADOServiceException(1);
+        }
+
+        _unitOfWork.BeginTrans();
+
+        int resultInt = 0;
+
+        List<JObject> results = new List<JObject>();
+        foreach (JObject insert in inserts)
+        {
+            // Delegate parameter building to specialized service
+            DynamicParameters parameters = _parameterBuilder.Build(insert);
+            //_parameterBuilder.AddReturnParameter(parameters);
+
+            dynamic? keys = repository.ExecuteQuerySingle(sysDAOInfo.sp_schema, sysDAOInfo.sp_ins, ref parameters);
+            resultInt = parameters.Get<int>("@pRet");
+
+            if (resultInt != 0)
             {
-                apiResult.Message = "Insert failed";
-                apiResult.StatusCode = "10000";
-                return apiResult;
+                _unitOfWork.RollbackTrans();
+                break;
             }
 
-            _unitOfWork.BeginTrans();
-
-            List<JObject> results = new List<JObject>();
-            foreach (JObject insert in inserts)
+            if (keys is not null)
             {
-                DynamicParameters parameters = new DynamicParameters();
-                foreach (JProperty property in insert.Properties())
+                IDictionary<string, object> keyMaps = (IDictionary<string, object>)keys;
+                foreach (var key in keyMaps)
                 {
-                    if (property.Type == JTokenType.Date)
-                    {
-                        parameters.Add(property.Name, property.Value.Value<DateTime>());
-                    }
-                    else
-                    {
-                        parameters.Add(property.Name, property.Value.ToString());
-                    }
+                    insert[key.Key] = JToken.FromObject(key.Value ?? "");
                 }
-                dynamic? keys = repository.ExecuteQuerySingle(sysDAOInfo.sp_ins, ref parameters);
-                int resultInt = parameters.Get<int>("@pRet");
-                if (resultInt != 0)
-                {
-                    _unitOfWork.RollbackTrans();
-                    apiResult.StatusCode = "10000";
-                    apiResult.Data = resultInt.ToString();
-                    apiResult.Message = "Insert failed";
-                    return apiResult;
-                }
-                if (keys is not null)
-                {
-                    IDictionary<string, object> keyMaps = (IDictionary<string, object>)keys;
-                    foreach (var key in keyMaps)
-                    {
-                        insert[key.Key] = JToken.FromObject(key.Value ?? "");
-                    }
-                }
-                results.Add(insert);
             }
-
-            _unitOfWork.CommitTrans();
-
-            apiResult.Data = results;
-            apiResult.StatusCode = "00000";
-            apiResult.Message = "Insert successful";
-            return apiResult;
+            results.Add(insert);
         }
-        catch (Exception ex)
-        {
-            _unitOfWork.RollbackTrans();
-            Common.Utilities.Log(ex);
-            throw;
-        }
+
+        _unitOfWork.CommitTrans();
+        return _resultMapper.MapBatchInsertResult(new JArray(results), resultInt);
     }
-    public ApiResult ExecuteUpdate(string code_name, JObject update)
+    public virtual ApiResult ExecuteUpdate(string code_name, JObject update)
     {
-        ApiResult apiResult = new ApiResult();
         IBaseRepository repository = _unitOfWork.Repository(typeof(IBaseRepository));
         sysDAOInfo? sysDAOInfo = repository.GetDAOInformation(code_name);
         if (sysDAOInfo is null)
         {
-            apiResult.Message = "Update failed";
-            apiResult.StatusCode = "10000";
-            return apiResult;
+            throw new BaseADOServiceException(1);
         }
 
-        DynamicParameters parameters = new DynamicParameters();
-        foreach (JProperty property in update.Properties())
-        {
-            if (property.Type == JTokenType.Date)
-            {
-                parameters.Add(property.Name, property.Value.Value<DateTime>());
-            }
-            else
-            {
-                parameters.Add(property.Name, property.Value.ToString());
-            }
-        }
+        // Delegate parameter building to specialized service
+        DynamicParameters parameters = _parameterBuilder.Build(update);
+        //_parameterBuilder.AddReturnParameter(parameters);
 
-        repository.ExecuteNonQuery(sysDAOInfo.sp_upd, ref parameters);
-        int resultInt = parameters.Get<int>("@pRet");
-        if (resultInt != 0)
-        {
-            apiResult.StatusCode = "10000";
-            apiResult.Data = resultInt.ToString();
-            apiResult.Message = "Update failed";
-            return apiResult;
-        }
+        // Execute update stored procedure
+        repository.ExecuteNonQuery(sysDAOInfo.sp_schema, sysDAOInfo.sp_upd, ref parameters);
+        int resultCode = parameters.Get<int>("@pRet");
 
-        apiResult.Data = update;
-        apiResult.StatusCode = "00000";
-        apiResult.Message = "Update successful";
-        return apiResult;
+        // Delegate result mapping to specialized service
+        return _resultMapper.MapUpdateResult(resultCode, update);
     }
-    public ApiResult ExecuteDelete(string code_name, JObject delete)
+    public virtual ApiResult ExecuteDelete(string code_name, JObject delete)
     {
-        ApiResult apiResult = new ApiResult();
         IBaseRepository repository = _unitOfWork.Repository(typeof(IBaseRepository));
         sysDAOInfo? sysDAOInfo = repository.GetDAOInformation(code_name);
         if (sysDAOInfo is null)
         {
-            apiResult.Message = "Delete failed";
-            apiResult.StatusCode = "10000";
-            return apiResult;
+            throw new BaseADOServiceException(1);
         }
 
-        DynamicParameters parameters = new DynamicParameters();
-        foreach (JProperty property in delete.Properties())
-        {
-            if (property.Type == JTokenType.Date)
-            {
-                parameters.Add(property.Name, property.Value.Value<DateTime>());
-            }
-            else
-            {
-                parameters.Add(property.Name, property.Value.ToString());
-            }
-        }
+        // Delegate parameter building to specialized service
+        DynamicParameters parameters = _parameterBuilder.Build(delete);
+        //_parameterBuilder.AddReturnParameter(parameters);
 
-        repository.ExecuteNonQuery(sysDAOInfo.sp_del, ref parameters);
-        int resultInt = parameters.Get<int>("@pRet");
-        if (resultInt != 0)
-        {
-            apiResult.StatusCode = "10000";
-            apiResult.Data = resultInt.ToString();
-            apiResult.Message = "Delete failed";
-            return apiResult;
-        }
+        // Execute delete stored procedure
+        repository.ExecuteNonQuery(sysDAOInfo.sp_schema, sysDAOInfo.sp_del, ref parameters);
+        int resultCode = parameters.Get<int>("@pRet");
 
-        apiResult.Data = delete;
-        apiResult.StatusCode = "00000";
-        apiResult.Message = "Delete successful";
-        return apiResult;
+        // Delegate result mapping to specialized service
+        return _resultMapper.MapDeleteResult(resultCode);
+    }
+}
+
+public class BaseADOServiceException : Exception
+{
+    public int _errorCode { get; }
+
+    public BaseADOServiceException(int errorCode) : base()
+    {
+        _errorCode = errorCode;
+    }
+
+    public BaseADOServiceException(string? s, int errorCode) : base(s)
+    {
+        _errorCode = errorCode;
+    }
+
+    public BaseADOServiceException(string? message, Exception? innerException, int errorCode) : base(message, innerException)
+    {
+        _errorCode = errorCode;
     }
 }

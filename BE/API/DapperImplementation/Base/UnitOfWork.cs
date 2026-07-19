@@ -18,9 +18,10 @@ public interface IUnitOfWork
 
 public sealed class UnitOfWork : IUnitOfWork
 {
+    private static readonly object UnitOfWorkLock = new object();
     private readonly IServiceProvider _provider;
     private readonly AdventureWorks2025Connection _connection;
-    private Dictionary<Type, IBaseRepository> _repositoryDictionaty = new Dictionary<Type, IBaseRepository>();
+    private Dictionary<Type, IBaseRepository> _repositoryDictionatyCache = new Dictionary<Type, IBaseRepository>();
 
     public UnitOfWork(IServiceProvider provider, AdventureWorks2025Connection connection)
     {
@@ -32,7 +33,7 @@ public sealed class UnitOfWork : IUnitOfWork
     {
         try
         {
-            if (!_repositoryDictionaty.ContainsKey(repository))
+            if (!_repositoryDictionatyCache.TryGetValue(repository, out IBaseRepository? repo))
             {
                 var baseGeneric = typeof(IEntityRepository<,>);
                 if (!repository.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == baseGeneric))
@@ -40,11 +41,14 @@ public sealed class UnitOfWork : IUnitOfWork
                     throw new InvalidOperationException($"Injected repository is invalid, {nameof(repository)}");
                 }
 
-                var scopedService = (IBaseRepository)_provider.GetRequiredService(repository);
-                _repositoryDictionaty.Add(repository, scopedService);
-                return scopedService;
+                // Avoid the possibility of modifying the cache dictionary while another thread is accessing it
+                lock (UnitOfWorkLock)
+                {
+                    repo = (IBaseRepository)_provider.GetRequiredService(repository);
+                    _repositoryDictionatyCache[repository] = repo;
+                }
             }
-            return _repositoryDictionaty[repository];
+            return repo;
         }
         catch (Exception ex)
         {

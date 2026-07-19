@@ -9,7 +9,7 @@ CREATE OR ALTER PROCEDURE [dbo].[asAddressUpd]
 AS
 	IF NOT EXISTS (SELECT * FROM Person.StateProvince WHERE StateProvinceID = @pStateProvinceID)
 	BEGIN
-		SET @pRet = 10001
+		SET @pRet = 10
 		RETURN
 	END
 

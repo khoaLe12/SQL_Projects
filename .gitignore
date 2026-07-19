@@ -1,9 +1,12 @@
 *.mdf
 *.ldf
+*.md
 
 Backup/
 
 Notes/InMemoryDB_mod1/
+
+.vs/
 
 BE/.vs/
 
@@ -21,3 +24,4 @@ BE/SQLAgent/bin/
 
 appsettings.json
 appsettings.Production.json
+

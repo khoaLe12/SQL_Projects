@@ -3,10 +3,10 @@ using API.Common;
 using API.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
+using Newtonsoft.Json.Serialization;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
-
-
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 var Configuration = builder.Configuration;
@@ -28,22 +28,21 @@ foreach (var method in methods)
     }
 }
 
-builder.Services.AddMvc();
 builder.Services.AddControllers(options => { })
     .ConfigureApiBehaviorOptions(options => { })
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.PropertyNamingPolicy = null;
-        options.JsonSerializerOptions.DictionaryKeyPolicy = null;
-    })
     .AddNewtonsoftJson(options =>
     {
         options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
-        //options.SerializerSettings.ContractResolver =
-        //    new Newtonsoft.Json.Serialization.DefaultContractResolver
-        //    {
-        //        NamingStrategy = new Newtonsoft.Json.Serialization.SnakeCaseNamingStrategy()
-        //    };
+        //options.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+        options.SerializerSettings.ContractResolver =
+            new Newtonsoft.Json.Serialization.DefaultContractResolver
+            {
+                NamingStrategy = new Newtonsoft.Json.Serialization.SnakeCaseNamingStrategy
+                {
+                    ProcessDictionaryKeys = true,
+                    OverrideSpecifiedNames = true
+                }
+            };
     });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -65,7 +64,6 @@ builder.Services.AddSwaggerGen(c =>
         [new OpenApiSecuritySchemeReference("bearer", document)] = []
     });
 });
-
 
 var app = builder.Build();
 

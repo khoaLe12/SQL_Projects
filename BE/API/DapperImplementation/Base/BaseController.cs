@@ -70,7 +70,7 @@ public class TransactionInformation
     }
 }
 
-public class BaseController : ControllerBase, IActionFilter
+public abstract class BaseController : ControllerBase, IActionFilter
 {
     private readonly IJwtTokenProvider _jwtTokenProvider;
     private readonly IKeyManager _keyManager;
