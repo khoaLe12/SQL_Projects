@@ -74,18 +74,6 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Base.API v1"));
-
-    app.Use(async (context, next) =>
-    {
-        try
-        {
-            await next();
-        }
-        catch (Exception ex)
-        {
-            Utilities.Log(ex);
-        }
-    });
 }
 
 app.UseHttpsRedirection();

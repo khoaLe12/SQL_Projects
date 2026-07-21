@@ -7,6 +7,7 @@ namespace API.Common;
 public static class ResultCode
 {
     public static readonly string SUCCESS = "00000";
+    public static readonly string INVALID_INPUT = "80001";
 
 
 
@@ -42,22 +43,32 @@ public static class ResultCode
             { "30547", "Reference constraint violation" }
         };
 
-    private static readonly Dictionary<string, string> RepositoryErrorMapping = new Dictionary<string, string>
-    {
-        { "50000", "Repository Error" },
-        { "50001", "Schema not existed" },
-        { "50002", "Table information is not declared" },
-        { "50003", "DAO information is not declared" },
-    };
-    private static readonly Dictionary<string, string> ServiceErrorMapping = new Dictionary<string, string>
-    {
-        { "60000", "Service Error" },
-        { "60001", "DAO information is not declared" },
-        { "60010", "Repository is not registered" },
-        { "60011", "UnitOfWork is not registered" },
-        { "60012", "ParameterBuilder is not registered" },
-        { "60013", "ResultMapper is not registered" },
-    };
+    private static readonly Dictionary<string, string> RepositoryErrorMapping = 
+        new Dictionary<string, string>
+        {
+            { "50000", "Repository Error" },
+            { "50001", "Schema not existed" },
+            { "50002", "Table information is not declared" },
+            { "50003", "DAO information is not declared" },
+        };
+
+    private static readonly Dictionary<string, string> ServiceErrorMapping = 
+        new Dictionary<string, string>
+        {
+            { "60000", "Service Error" },
+            { "60001", "DAO information is not declared" },
+            { "60010", "Repository is not registered" },
+            { "60011", "UnitOfWork is not registered" },
+            { "60012", "ParameterBuilder is not registered" },
+            { "60013", "ResultMapper is not registered" },
+        };
+
+    private static readonly Dictionary<string, string> BadRequestMapping =
+        new Dictionary<string, string>
+        {
+            { "80000", "Bad Request" },
+            { "80001", "Invalid Input" }
+        };
 
 
 
@@ -104,6 +115,10 @@ public static class ResultCode
     {
         return ServiceErrorMapping.GetValueOrDefault(resultCode, "Service operation failed");
     }
+    public static string GetBadRequestMessage(string resultCode)
+    {
+        return BadRequestMapping.GetValueOrDefault(resultCode, "Bad Request");
+    }
 
 
 
@@ -128,6 +143,11 @@ public static class ResultCode
         if (resultCode.StartsWith("6"))
         {
             return StatusCodes.Status500InternalServerError;
+        }
+
+        if (resultCode.StartsWith("8"))
+        {
+            return StatusCodes.Status400BadRequest;
         }
 
         return StatusCodes.Status400BadRequest; // Default to client error for unknown codes
