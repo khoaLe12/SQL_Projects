@@ -13,6 +13,21 @@ AS
 		RETURN
 	END
 
+	IF EXISTS (
+		SELECT * FROM 
+		Person.Address 
+		WHERE AddressLine1 = @pAddressLine1 
+			AND AddressLine2 = @pAddressLine2
+			AND City = @pCity
+			AND StateProvinceID = @pStateProvinceID
+			AND PostalCode = @pPostalCode
+			AND AddressID <> @pAddressID
+	)
+	BEGIN
+		SET @pRet = 2627
+		RETURN
+	END
+
 	UPDATE Person.Address
 	SET AddressLine1 = @pAddressLine1,
 		AddressLine2 = @pAddressLine2,

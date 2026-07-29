@@ -1,4 +1,5 @@
 ﻿using API.DapperImplementation.Base;
+using API.DapperImplementation.Base.Repository;
 using API.Models.SysEntities;
 using Dapper;
 using Newtonsoft.Json;

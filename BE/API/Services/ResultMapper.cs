@@ -1,5 +1,6 @@
-using Newtonsoft.Json.Linq;
 using API.Common;
+using Newtonsoft.Json.Linq;
+using System.Reflection;
 
 namespace API.Services;
 
@@ -26,10 +27,10 @@ public class ResultMapper : IResultMapper
             resultCode = ResultCode.GetInsertResultCode(returnCode);
             message = ResultCode.GetInsertMessage(resultCode);
         }
-        return new ApiResult(resultCode, insertData, message);
+        return new ApiResult(resultCode, returnCode == 0 ? insertData : returnCode.ToString(), message);
     }
 
-    public ApiResult MapInsertResult(JObject insertData, dynamic? generatedKeys = null, int returnCode = 0)
+    public ApiResult MapInsertResult(JObject insertData, object? generatedKeys = null, int returnCode = 0)
     {
         string resultCode = "00000";
         string message = "Insert executed successfully";
@@ -40,16 +41,22 @@ public class ResultMapper : IResultMapper
         }
         if (generatedKeys is not null)
         {
-            var keyMaps = (IDictionary<string, object>)generatedKeys;
+            var keyMaps = generatedKeys.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (var key in keyMaps)
             {
-                insertData[key.Key] = JToken.FromObject(key.Value ?? "");
+                var keyValue = key.GetValue(generatedKeys);
+                if (keyValue != null) insertData[key.Name] = JToken.FromObject(keyValue);
             }
         }
-        return new ApiResult(resultCode, insertData, message);
+        var resultReturn = new
+        {
+            data = insertData,
+            keys = generatedKeys
+        };
+        return new ApiResult(resultCode, returnCode == 0 ? resultReturn : returnCode.ToString(), message);
     }
 
-    public ApiResult MapUpdateResult(int returnCode, JObject? updatedData = null)
+    public ApiResult MapUpdateResult(int returnCode, JObject updatedData)
     {
         string resultCode = "00000";
         string message = "Update executed successfully";
@@ -58,7 +65,7 @@ public class ResultMapper : IResultMapper
             resultCode = ResultCode.GetUpdateResultCode(returnCode);
             message = ResultCode.GetUpdateMessage(resultCode);
         }
-        return new ApiResult(resultCode, updatedData ?? new JObject(), message);
+        return new ApiResult(resultCode, returnCode == 0 ? updatedData : returnCode.ToString(), message);
     }
 
     public ApiResult MapDeleteResult(int returnCode)
@@ -70,6 +77,6 @@ public class ResultMapper : IResultMapper
             resultCode = ResultCode.GetDeleteResultCode(returnCode);
             message = ResultCode.GetDeleteMessage(resultCode);
         }
-        return new ApiResult(resultCode, "", message);
+        return new ApiResult(resultCode, returnCode == 0 ? "" : returnCode.ToString(), message);
     }
 }

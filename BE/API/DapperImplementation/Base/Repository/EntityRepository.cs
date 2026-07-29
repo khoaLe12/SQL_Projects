@@ -4,59 +4,63 @@ using Dapper;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
 
-namespace API.DapperImplementation.Base;
+namespace API.DapperImplementation.Base.Repository;
 
 public interface IEntityRepository<T, TKeys> : IBaseRepository where T : BaseEntity where TKeys : EntityKey
 {
-    IEnumerable<T> QueryEntities(JObject search);
-    IEnumerable<dynamic> ExecuteGet(JObject search);
-    int ExecuteInsert(JObject data);
-    int ExecuteUpdate(TKeys keys, JObject data);
-    int ExecuteDelete(TKeys keys);
+    IEnumerable<T> QueryEntities(string sc_name, string sp_name, ref DynamicParameters parameters);
+    IEnumerable<dynamic> ExecuteGet(string sc_name, string sp_name, ref DynamicParameters parameters);
+    int ExecuteInsert(string sc_name, string sp_name, ref DynamicParameters parameters);
+    int ExecuteUpdate(string sc_name, string sp_name, TKeys keys, ref DynamicParameters parameters);
+    int ExecuteDelete(string sc_name, string sp_name, DynamicParameters parameters);
+
+    IEnumerable<T> QueryEntities(string sc_name, string sp_name, JObject search);
+    IEnumerable<dynamic> ExecuteGet(string sc_name, string sp_name, JObject search);
+    int ExecuteInsert(string sc_name, string sp_name, JObject data);
+    int ExecuteUpdate(string sc_name, string sp_name, TKeys keys, JObject data);
+    int ExecuteDelete(string sc_name, string sp_name, TKeys keys);
 }
 
 public class EntityRepository<T, TKeys> : BaseRepository, IEntityRepository<T, TKeys> where T : BaseEntity where TKeys : EntityKey
 {
-    protected readonly SysDictionary _sysDictionary;
-    protected readonly sysDAOInfo _sysDAOInfo;
-    protected readonly string _schema;
+    public EntityRepository(AdventureWorks2025Connection connection) : base(connection) { }
 
-    public EntityRepository(AdventureWorks2025Connection connection, string schema) : base(connection)
+
+    public virtual IEnumerable<T> QueryEntities(string sc_name, string sp_name, ref DynamicParameters parameters)
     {
-        _schema = schema;
-
-        // Check schema existence
-        DynamicParameters parameters = new DynamicParameters();
-        parameters.Add("Schema_name", schema);
-        ExecuteNonQuery("dbo", "asCheckSchemaName", ref parameters);
-        if (parameters.Get<int>("@pRet") != 0)
-        {
-            throw new BaseADORepoException($"Schema {schema} not exists", 1);
-        }
-
-        // Retrieve system information
-        var sysDictionary = GetDictionaryInformation("", _schema, typeof(T).Name);
-        if (sysDictionary is null)
-        {
-            throw new BaseADORepoException($"Table information is not declared, {nameof(sysDictionary)}", 2);
-        }
-        var sysDAOInfo = GetDAOInformation(sysDictionary.code_name);
-        if (sysDAOInfo is null)
-        {
-            throw new BaseADORepoException($"DAO information is not declared, {nameof(sysDAOInfo)}", 3);
-        }
-
-        _sysDictionary = sysDictionary;
-        _sysDAOInfo = sysDAOInfo;
+        var result = ExecuteQuery<T>(sc_name, sp_name, ref parameters);
+        return result;
     }
 
-    public virtual IEnumerable<T> QueryEntities(JObject search)
+    public virtual IEnumerable<dynamic> ExecuteGet(string sc_name, string sp_name, ref DynamicParameters parameters)
     {
-        BeforeExecute();
+        var result = ExecuteQuery(sc_name, sp_name, ref parameters);
+        return result;
+    }
 
-        string sc_name = _sysDAOInfo.sp_schema;
-        string sp_name = _sysDAOInfo.sp_get;
+    public virtual int ExecuteInsert(string sc_name, string sp_name, ref DynamicParameters parameters)
+    {
+        ExecuteNonQuery(sc_name, sp_name, ref parameters);
+        return parameters.Get<int>("@pRet");
+    }
 
+    public virtual int ExecuteUpdate(string sc_name, string sp_name, TKeys keys, ref DynamicParameters parameters)
+    {
+        keys.AttachKeys(ref parameters);
+        ExecuteNonQuery(sc_name, sp_name, ref parameters);
+        return parameters.Get<int>("@pRet");
+    }
+
+    public virtual int ExecuteDelete(string sc_name, string sp_name, DynamicParameters parameters)
+    {
+        ExecuteNonQuery(sc_name, sp_name, ref parameters);
+        return parameters.Get<int>("@pRet");
+    }
+
+
+
+    public virtual IEnumerable<T> QueryEntities(string sc_name, string sp_name, JObject search)
+    {
         DynamicParameters parameters = new DynamicParameters();
         foreach (JProperty property in search.Properties())
         {
@@ -73,22 +77,13 @@ public class EntityRepository<T, TKeys> : BaseRepository, IEntityRepository<T, T
             }
             parameters.Add(property.Name, value);
         }
-        parameters = getParamForProc(sc_name, sp_name, parameters);
 
-        var result = _connection.ExecuteQuery<T>(sc_name, sp_name, parameters);
-
-        AfterExecute();
-
+        var result = ExecuteQuery<T>(sc_name, sp_name, ref parameters);
         return result;
     }
 
-    public virtual IEnumerable<dynamic> ExecuteGet(JObject search)
+    public virtual IEnumerable<dynamic> ExecuteGet(string sc_name, string sp_name, JObject search)
     {
-        BeforeExecute();
-
-        string sc_name = _sysDAOInfo.sp_schema;
-        string sp_name = _sysDAOInfo.sp_get;
-
         DynamicParameters parameters = new DynamicParameters();
         foreach (JProperty property in search.Properties())
         {
@@ -107,19 +102,11 @@ public class EntityRepository<T, TKeys> : BaseRepository, IEntityRepository<T, T
         }
 
         var result = ExecuteQuery(sc_name, sp_name, ref parameters);
-
-        AfterExecute();
-
         return result;
     }
 
-    public virtual int ExecuteInsert(JObject data)
+    public virtual int ExecuteInsert(string sc_name, string sp_name, JObject data)
     {
-        BeforeExecute();
-
-        string sc_name = _sysDAOInfo.sp_schema;
-        string sp_name = _sysDAOInfo.sp_ins;
-
         DynamicParameters parameters = new DynamicParameters();
         foreach (JProperty property in data.Properties())
         {
@@ -141,29 +128,17 @@ public class EntityRepository<T, TKeys> : BaseRepository, IEntityRepository<T, T
         if (result is not null)
         {
             IDictionary<string, object> resultMap = (IDictionary<string, object>)result;
-            PropertyInfo[] keys = typeof(TKeys).GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            foreach (PropertyInfo key in keys)
+            foreach(KeyValuePair<string, object> item in resultMap)
             {
-                string keyName = key.Name;
-                object? keyValue = resultMap[keyName];
-                if (keyValue is not null)
-                {
-                    data[keyName] = JToken.FromObject(keyValue ?? "");
-                }
+                data[item.Key] = JToken.FromObject(item.Value);
             }
         }
 
-        AfterExecute();
         return parameters.Get<int>("@pRet");
     }
 
-    public virtual int ExecuteUpdate(TKeys keys, JObject data)
+    public virtual int ExecuteUpdate(string sc_name, string sp_name, TKeys keys, JObject data)
     {
-        BeforeExecute();
-
-        string sc_name = _sysDAOInfo.sp_schema;
-        string sp_name = _sysDAOInfo.sp_upd;
-
         DynamicParameters parameters = new DynamicParameters();
         keys.AttachKeys(ref parameters);
         foreach (JProperty property in data.Properties())
@@ -183,29 +158,35 @@ public class EntityRepository<T, TKeys> : BaseRepository, IEntityRepository<T, T
         }
 
         ExecuteNonQuery(sc_name, sp_name, ref parameters);
-
-        AfterExecute();
         return parameters.Get<int>("@pRet");
     }
 
-    public virtual int ExecuteDelete(TKeys keys)
+    public virtual int ExecuteDelete(string sc_name, string sp_name, TKeys keys)
     {
-        BeforeExecute();
-
-        string sc_name = _sysDAOInfo.sp_schema;
-        string sp_name = _sysDAOInfo.sp_del;
-
         DynamicParameters parameters = new DynamicParameters();
         keys.AttachKeys(ref parameters);
 
         ExecuteNonQuery(sc_name, sp_name, ref parameters);
-
-        AfterExecute();
         return parameters.Get<int>("@pRet");
     }
+}
 
+public class EntityRepoException : Exception
+{
+    public int _errorCode { get; }
 
+    public EntityRepoException(int errorCode) : base()
+    {
+        _errorCode = errorCode;
+    }
 
-    protected virtual void BeforeExecute() { }
-    protected virtual void AfterExecute() { }
+    public EntityRepoException(string? s, int errorCode) : base(s)
+    {
+        _errorCode = errorCode;
+    }
+
+    public EntityRepoException(string? message, Exception? innerException, int errorCode) : base(message, innerException)
+    {
+        _errorCode = errorCode;
+    }
 }

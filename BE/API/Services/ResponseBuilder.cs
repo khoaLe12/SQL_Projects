@@ -1,5 +1,6 @@
 using API.Common;
 using API.DapperImplementation.Base;
+using API.DapperImplementation.Base.Repository;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -28,7 +29,7 @@ public class ResponseBuilder : IResponseBuilder
     public IActionResult HandleException(Exception ex)
     {
         Utilities.Log(ex);
-        if (ex is BaseADORepoException repoException)
+        if (ex is EntityRepoException repoException)
         {
             string statusCode = ResultCode.GetRepositoryErrorCode(repoException._errorCode);
             string message = ResultCode.GetRepositoryErrorMessage(statusCode);

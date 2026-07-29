@@ -61,6 +61,8 @@ public static class ResultCode
             { "60011", "UnitOfWork is not registered" },
             { "60012", "ParameterBuilder is not registered" },
             { "60013", "ResultMapper is not registered" },
+            { "60014", "SystemRepository is not registered" },
+            { "60015", "Data table is not declared" }
         };
 
     private static readonly Dictionary<string, string> BadRequestMapping =

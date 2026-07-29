@@ -1,27 +1,30 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using API.Common;
+using API.DapperImplementation.Base.Repository;
 using API.Models;
-using API.Common;
+using API.Models.BaseModel;
+using Microsoft.Extensions.DependencyInjection;
 using System;
+using static Dapper.SqlMapper;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace API.DapperImplementation.Base;
 
-
-public interface IUnitOfWork
+public interface IUnitOfWork<T> where T : IBaseRepository
 {
-    public IBaseRepository Repository(Type repository);
+    public TRepo? Repository<TRepo>() where TRepo : T;
     public void BeginTrans();
     public void CommitTrans();
     void RollbackTrans();
     void Dispose();
 }
 
-public sealed class UnitOfWork : IUnitOfWork
+public sealed class UnitOfWork<T> : IUnitOfWork<T> where T : IBaseRepository
 {
     private static readonly object UnitOfWorkLock = new object();
+
     private readonly IServiceProvider _provider;
     private readonly AdventureWorks2025Connection _connection;
-    private Dictionary<Type, IBaseRepository> _repositoryDictionatyCache = new Dictionary<Type, IBaseRepository>();
+    private Dictionary<Type, T> _repositoryDictionatyCache = new Dictionary<Type, T>();
 
     public UnitOfWork(IServiceProvider provider, AdventureWorks2025Connection connection)
     {
@@ -29,26 +32,27 @@ public sealed class UnitOfWork : IUnitOfWork
         _provider = provider;
     }
 
-    public IBaseRepository Repository(Type repository)
+    public TRepo? Repository<TRepo>() where TRepo : T
     {
         try
         {
-            if (!_repositoryDictionatyCache.TryGetValue(repository, out IBaseRepository? repo))
+            var key = typeof(TRepo);
+            if (!_repositoryDictionatyCache.TryGetValue(key, out T? repo))
             {
-                var baseGeneric = typeof(IEntityRepository<,>);
-                if (!repository.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == baseGeneric))
-                {
-                    throw new InvalidOperationException($"Injected repository is invalid, {nameof(repository)}");
-                }
-
                 // Avoid the possibility of modifying the cache dictionary while another thread is accessing it
                 lock (UnitOfWorkLock)
                 {
-                    repo = (IBaseRepository)_provider.GetRequiredService(repository);
-                    _repositoryDictionatyCache[repository] = repo;
+                    if (!_repositoryDictionatyCache.TryGetValue(key, out repo))
+                    {
+                        // Resolve the concrete implementation for the requested repository interface
+                        var resolved = (T)_provider.GetRequiredService(key);
+                        _repositoryDictionatyCache[key] = resolved;
+                        repo = resolved;
+                    }
                 }
             }
-            return repo;
+
+            return (TRepo?)repo;
         }
         catch (Exception ex)
         {

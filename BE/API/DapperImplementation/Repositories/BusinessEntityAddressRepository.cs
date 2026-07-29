@@ -1,4 +1,5 @@
 ﻿using API.DapperImplementation.Base;
+using API.DapperImplementation.Base.Repository;
 using API.Models.BaseModel;
 using API.Models.Entities;
 
@@ -17,7 +18,7 @@ public partial interface IBusinessEntityAddressRepository : IEntityRepository<Bu
 
 public partial class BusinessEntityAddressRepository : EntityRepository<BusinessEntityAddress, BusinessEntityAddressKey>, IBusinessEntityAddressRepository
 {
-    public BusinessEntityAddressRepository(AdventureWorks2025Connection connection) : base(connection, "Person")
+    public BusinessEntityAddressRepository(AdventureWorks2025Connection connection) : base(connection)
     {
     }
 }

@@ -3,8 +3,9 @@ using System.Reflection;
 
 namespace API.Models.BaseModel;
 
-public abstract class EntityKey
+public class EntityKey
 {
+    public EntityKey() { }
     public virtual void AttachKeys(ref DynamicParameters parameters)
     {
         PropertyInfo[] props = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
