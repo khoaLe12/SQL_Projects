@@ -37,6 +37,30 @@ public static class Utilities
         }
     }
 
+    public static void AgentLog(string message)
+    {
+        string filename = DateTime.Now.ToString("yyyy-MM-dd") + ".txt";
+        string contentRoot = Environment.CurrentDirectory;
+        string logFile = Path.Combine(contentRoot, "AgentLog\\", filename);
+        if (!File.Exists(logFile))
+        {
+            using (Stream s = File.Create(logFile))
+            {
+                using (StreamWriter w = new StreamWriter(s, Encoding.UTF8))
+                {
+                    w.Write(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " - " + message);
+                }
+            }
+        }
+        else
+        {
+            File.AppendAllLines(logFile, new List<string> {
+                "\n",
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " - " + message
+            });
+        }
+    }
+
     public static string HashPassword(string password, int iterations = 100000)
     {
         // derive a 128-bit subkey (use HMACSHA256 with 100,000 iterations)

@@ -13,10 +13,13 @@ public static partial class DependencyInjection
     public static IServiceCollection AddDapperDependencies(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<AdventureWorks2025Connection>(provider => new AdventureWorks2025Connection(configuration.GetConnectionString("MsSQLConnectionADONet") ?? throw new ArgumentException("Connection string not found")));
+        services.AddScoped<AdventureWorks2025BackupConnection>(provider => new AdventureWorks2025BackupConnection(configuration.GetConnectionString("BackupMsSQLConnection") ?? throw new ArgumentException("Connection string not found")));
 
-        services.AddScoped<IUnitOfWork<IEntityRepository<BaseEntity, EntityKey>>, UnitOfWork<IEntityRepository<BaseEntity, EntityKey>>>();
         services.AddScoped<ISystemRepository, SystemRepository>();
         services.AddScoped<IEntityRepository<BaseEntity, EntityKey>, EntityRepository<BaseEntity, EntityKey>>();
+        services.AddScoped<ICommonRepository, CommonRepository>();
+        services.AddScoped<IBackupRepository, BackupRepository>();
+        services.AddScoped<IUnitOfWork<IEntityRepository<BaseEntity, EntityKey>>, UnitOfWork<IEntityRepository<BaseEntity, EntityKey>>>();
         
         services.AddScoped<IHomeRepository, HomeRepository>();
         services.AddScoped<IHomeServices, HomeServices>();

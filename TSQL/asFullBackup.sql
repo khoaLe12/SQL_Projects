@@ -2,7 +2,7 @@ USE [AdventureWorks2025_backup]
 GO
 
 CREATE OR ALTER PROCEDURE [dbo].[asFullBackup]
-	@pDb_name Nvarchar(128),
+	@pDb_name Nvarchar(128) = 'AdventureWorks2025',
 	@pIs_recovery Bit = 0,
 	@pRet Int OUTPUT,
 	@pRecovery_id Int OUTPUT
@@ -165,7 +165,6 @@ AS
 				0,
 				'Backup set not found',
 				0
-
 
 			SET @pRet = 1;
 		END

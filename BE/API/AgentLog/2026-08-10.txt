@@ -1,0 +1,36 @@
+﻿2026-08-10 19:49:04 - Full backup 1 failed, 2.
+
+2026-08-10 20:24:43 - Differential backup 2 failed, 2.
+
+
+2026-08-10 20:24:43 - Log backup 4 failed, 1.
+
+
+2026-08-10 20:25:43 - Differential backup 5 failed, 2.
+
+
+2026-08-10 20:25:43 - Log backup 7 failed, 1.
+
+
+2026-08-10 20:26:43 - Differential backup 8 failed, 2.
+
+
+2026-08-10 20:26:43 - Log backup 10 failed, 1.
+
+
+2026-08-10 20:27:43 - Differential backup 12 failed, 2.
+
+
+2026-08-10 20:27:43 - Log backup 13 failed, 1.
+
+
+2026-08-10 20:28:43 - Differential backup 14 failed, 2.
+
+
+2026-08-10 20:28:43 - Log backup 16 failed, 1.
+
+
+2026-08-10 20:29:43 - Differential backup 18 failed, 2.
+
+
+2026-08-10 20:29:43 - Log backup 19 failed, 1.

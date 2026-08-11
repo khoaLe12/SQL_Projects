@@ -1,6 +1,7 @@
 ﻿using API;
 using API.Common;
 using API.DependencyInjection;
+using API.SQLAgent;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Newtonsoft.Json.Serialization;
@@ -64,6 +65,8 @@ builder.Services.AddSwaggerGen(c =>
         [new OpenApiSecuritySchemeReference("bearer", document)] = []
     });
 });
+
+builder.Services.AddHostedService<SQLAgent>();
 
 var app = builder.Build();
 

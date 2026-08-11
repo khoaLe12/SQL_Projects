@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OpenApi;
 using Newtonsoft.Json.Linq;
 using API.EFCoreImplementation.Services;
 using API.Models.Entities;

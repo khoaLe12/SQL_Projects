@@ -2,8 +2,9 @@ USE [AdventureWorks2025_backup]
 GO
 
 CREATE OR ALTER PROCEDURE [dbo].[asDifferentialBackup]
-	@pDb_name Nvarchar(128),
-	@pRet Int OUTPUT
+	@pDb_name Nvarchar(128) = 'AdventureWorks2025',
+	@pRet Int OUTPUT,
+	@pRecovery_id Int OUTPUT
 AS	
 	SET NOCOUNT ON;
 	SET @pRet= 0;
@@ -22,6 +23,7 @@ AS
 			@last_level Hierarchyid = NULL,
 			@next_level Hierarchyid = NULL,
 			@start_time Datetimeoffset = GETDATE();
+		DECLARE @inserted TABLE (id Int);
 
 
 
@@ -53,11 +55,11 @@ AS
 		IF ISNULL(@ref_backup_id, 0) = 0
 		BEGIN
 			DECLARE @pResult Int = 1,
-				@pRecovery_id Int = 0
+				@Recovery_id Int = 0
 
 			IF @auto_chain_initial = 1
 			BEGIN
-				EXEC [dbo].[asFullBackup] @pDb_name, @pRet = @pResult OUTPUT, @pRecovery_id = @pRecovery_id OUTPUT
+				EXEC [dbo].[asFullBackup] @pDb_name, @pRet = @pResult OUTPUT, @pRecovery_id = @Recovery_id OUTPUT
 				SET @start_time = GETDATE();
 			END
 
@@ -76,6 +78,7 @@ AS
 					[error_message],
 					[duration_sec]
 				)
+				OUTPUT INSERTED.id INTO @inserted(id)
 				SELECT
 					@start_time,
 					'I',
@@ -91,7 +94,7 @@ AS
 
 				SET @pRet = 1;
 
-				RETURN;
+				GOTO ReturnSection;
 			END
 
 			SELECT TOP 1
@@ -201,6 +204,7 @@ AS
 				[error_message],
 				[duration_sec]
 			)
+			OUTPUT INSERTED.id INTO @inserted(id)
 			SELECT
 				@start_time,
 				'I',
@@ -230,6 +234,7 @@ AS
 				[error_message],
 				[duration_sec]
 			)
+			OUTPUT INSERTED.id INTO @inserted(id)
 			SELECT
 				@start_time,
 				'I',
@@ -260,6 +265,7 @@ AS
 			[error_message],
 			[duration_sec]
 		)
+		OUTPUT INSERTED.id INTO @inserted(id)
 		SELECT
 			@start_time,
 			'I',
@@ -276,7 +282,11 @@ AS
 		SET @pRet = 2;
 	END CATCH
 
+	ReturnSection:
+
 	IF @pRet = 0 SET @pRet = @@ERROR
+
+	SELECT TOP 1 @pRecovery_id = id FROM @inserted
 
 	IF OBJECT_ID('tempdb..#temp') IS NOT NULL
 			DROP TABLE #temp
