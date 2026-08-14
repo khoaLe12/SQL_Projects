@@ -1,0 +1,89 @@
+
+-- TRANSACTION LOCKING AND ROW VERSIONING
+-- 1. TRANSACTION:
+--	+ A transaction is a sequence of operations performed as a single logical unit of work.
+--	+ A logical unit of work must exhibit ACID properties:
+--		- Atomicity: either all operations within transaction are performed, or none of them are performed.
+--		- Consistency: guarantees data integrity, adhere to all defined constraints, and keeps the database in valid/consistent state relative to organization's business rules at the end of transaction.
+--		- Isolation: ensure concurrent transactions to work independently without interfering each other process, prevent conflicts and maintain data consistency.
+--		- Durability: once a transaction is committed, its changes are permanently saved, even if the system fails.
+--	+ Transaction can be controlled manually or handled automatically by system:
+--		- Explicit Transactions: explicitly defined both the start and end of the transaction through an API function or by issuing the T-SQL statement (BEGIN TRANSACTION, COMMIT TRANSACTION, ROLLBACK TRANSACTION, ...).
+--		- Implicit Transactions: database engine automatically starts a new transaction after other finished, this mode provides a continuous chain of transactions.
+--		- Autocommit Transactions: is the default mode of the database engine, apply to every T-SQL statement, and can be overriden by either explicit or implicit transactions.
+--		- Batch-scoped Transactions: applied to a batch of statements in a session.
+--		- Distributed Transactions: span a transaction to other database instances, the management of the transaction must be coordinated between the resource managers by a transaction manager.
+--	+ Transaction can be end by specifing COMMIT or ROLLBACK command, or is automatically rolled back by server if an error ocurrs. It is pereferred to use TRY CATCH block to manually handle errors.
+-- 2. CONCURRENCY CONTROL:
+--	+ To effectively manage concurrent transactions, SQL server provides LOCKING MECHANISM and TRANSACTION ISOLATION LEVELS.
+--	+ Without concurrency control, users could see the following side effects:
+--		- Lost updates: occur when two or more transactions update the same rows, the last update overwrites the other, which results in lost data.
+--		- Uncommitted dependency (dirty read): occur when a transaction reads uncommitted row that's being updated by another transaction which hasn't been committed yet.
+--		- Inconsistent analysis (nonrepeatable read): occur when a transaction accesses the same row several times and reads different data each time (caused by the read data is modified by other transactions).
+--		- Phantom read: occur when there are multiple identical reads in the same transaction, and the later read got more data compared to earlier read (caused by other transaction insert new data within search range at a point between those reads).
+--	+ Concurrency control theory has two classifications for the methods of instituting concurrency control:
+--		- Pessimistic concurrency control: transactions lock requested resource, ideal in a scenario of high contention of data, where the cost of protecting data is less than the cost of resolving concurrency conflicts.
+--		- Optimistic concurrency control: transactions don't lock data when they read it. But during the update operation, if the data is changed after they are read, the system will raise error and roll back. 
+--		  This useful in the system where contention for data is low, and where the cost of ocassionally rolling back a transaction is lower than the cost of locking data when read.
+-- 3. TRANSACTION ISOLATION LEVELS: 
+--	+ Defines the degree to which one transaction must be isolated from the resource or data modifications made by other transactions.
+--	+ Transaction isolation levels control:
+--		- Whether locks are acquired when data is read, and what types of locks are requested.
+--		- How long the read locks are held.
+--		- Whether a read operation referencing rows modified by another transaction:
+--			* Blocks until the exclusive lock is freed.
+--			* Retrieves the committed version of the row at the time the statement or transaction started.
+--			* Reads the uncommitted data modification.
+--	+ A lower isolation level increases the ability of many transactions to access data at the same time, but increases the number of concurrency effects transactions might encounter.
+--	+ A higher isolation level reduces the types of concurrency effects, but requires more system resources and increases the chances that one transaction blocks another.
+--	+ Isolation levels (include two options that support row versioning):
+--		- READ UNCOMMITTED: dirty reads are allowed, one transaction might see not-yet-committed changes made by other transactions.
+--		- READ COMMITTED: is the default level, read locks are hold only during the read operation (ex: single select statement) is performed, the write lock is persist during the transaction.
+--		- REPEATABLE READ: the database engine keeps read and write locks until the end of the transaction, range-locks aren't managed, phantom reads can occur.
+--		- SERIALIZABLEl: the highest level where transactions are completely isolated from one another.
+--		- Read Committed Snapshot (RCSI): use row versioning to provide snapshot read on each statement (statement-level read consistency), no other locks acquired on reading resource except the schema stability (Sch-S) table level locks.
+--		- SNAPSHOT: use row versioning to provide transaction-level read consistency, only the schema stability (Sch-S) table locks are acquired.
+--	+ Concurrency side effects ocurred by the different isolation levels (Dirty read - D, Nonrepeatable read - N, Phantom read - P):
+--		- READ UNCOMMITTED: D, N, P
+--		- READ COMMITTED: N, P
+--		- REPEATABLE READ: P
+--		- SNAPSHOT, SERIALIZABLE: none
+--	+ Use T-SQL statement to set isolation level: SET TRANSACTION ISOLATION LEVEL { READ UNCOMMITTED | READ COMMITTED | REPEATABLE READ | SNAPSHOT | SERIALIZABLE }
+-- 4. LOCKING:
+--	+ Locking is a mechanism used to synchronize access by mutiple users to the same piece of data at the same time.
+--	+ Locks have different modes, each mode define the level of dependency and compatibility level. If a transaction request a lock that conflicts with other existing locks, the request will be paused until these locks are released.
+--	+ How long a transaction holds the lock depends on the transaction isolation level settings and whether or not optimized locking is enabled.
+--	+ All locks held by a transaction are released when the transaction completes (either commits or rolls back).
+--	+ Locks are granted and managed by lock manager, ensure no lock confliction exists.
+-- 5. LOCK GRANULARITY AND HIERARCHIES:
+--	+ The Database Engine provide lock granularity to identify which type of resources to be locked.
+--	+ There are multiple levels of granualarity (also called lock hierarchy):
+--		- RID: lock a single row within a heap.
+--		- KEY: lock a single row in a B-tree index.
+--		- PAGE: an 8 kilobyte page, such as data or index pages.
+--		- EXTENT: a contiguous group of eight pages.
+--		- HoBT: a heap or B-tree (data or index pages) lock.
+--		- TABLE: lock the entire table, including all data and indexes.
+--		- FILE: a database file.
+--		- APPLICATION: an application-specified resource.
+--		- METADATA: metadata locks.
+--		- ALLOCATION_UNIT: an allocation unit.
+--		- DATABASE: the entire database.
+--		- XACT: transaction ID lock used in Optimized locking.
+--	+ Manually specifying lock granularity should be carefully considered of its tradeoff:
+--		- number of locks: small granularity (such as row lock) requires a large number of locks, larger granualarity requires fewer locks
+--			* More locks to be stored and managed result in higher overhead.
+--		- concurrency ability: small granualarity restricts access to small part of table thus increase concurrency, higher granularity reduce concurrency.
+-- 6. LOCK MODES:
+--	+ The lock modes used to determine how the resource can be accessed:
+--		- Shared (S): used for read operations such as SELECT statement.
+--		- Update (U): used with UPLOCK hint on resources that can be updated, prevent deadlock might occur in SELECT then UPDATE format.
+--		- Exclusive (X): used for data-modification operations, such as INSERT, UPDATE, or DELETE.
+--		- Intent: used to establish a lock hierarchy by specifying a higher granularity level (usually TABLE), improve lock management
+--			types of intent locks are: intent shared (IS), intent exclusive (IX), and shared with intent exclusive (SIX).
+--		- Schema: schema modification (Sch-M) to prevent any operations on table, and schema stability (Sch-S) to prevent any schema modification.
+--		- Bulk Update (BU): used when bulk copying data into a table with the TABLOCK hint.
+--		- Key-range: protects the range of rows read by a query when using SERIALIZABLE transaction isolation level.
+--	+ 
+
+
