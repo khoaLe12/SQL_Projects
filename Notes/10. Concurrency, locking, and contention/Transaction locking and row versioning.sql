@@ -14,6 +14,7 @@
 --		- Batch-scoped Transactions: applied to a batch of statements in a session.
 --		- Distributed Transactions: span a transaction to other database instances, the management of the transaction must be coordinated between the resource managers by a transaction manager.
 --	+ Transaction can be end by specifing COMMIT or ROLLBACK command, or is automatically rolled back by server if an error ocurrs. It is pereferred to use TRY CATCH block to manually handle errors.
+--	+ 
 -- 2. CONCURRENCY CONTROL:
 --	+ To effectively manage concurrent transactions, SQL server provides LOCKING MECHANISM and TRANSACTION ISOLATION LEVELS.
 --	+ Without concurrency control, users could see the following side effects:
@@ -55,6 +56,20 @@
 --	+ How long a transaction holds the lock depends on the transaction isolation level settings and whether or not optimized locking is enabled.
 --	+ All locks held by a transaction are released when the transaction completes (either commits or rolls back).
 --	+ Locks are granted and managed by lock manager, ensure no lock confliction exists.
+--	+ Lock can be converted into different lock modes.
+--	+ There is a trade off between locking cost and concurrency cost. Using low-level locks increases concurrency but also increase system overhead, opposite with high-level locks.
+--	+ It is recommended to acquire only a small number of lock at a time, it reduces the lock memory and ocurrence of lock escalations.
+--		* Ex: Use read uncommitted/ read snapshot (use with caution), enable optimized locking, limit the number of rows updated/deleted at a time (DELETE/UPDATE TOP 500 repeatedly until @@ROWCOUNT is 0)
+--	==================================================
+--	DECLARE @DeletedRows int;
+--	WHILE @DeletedRows IS NULL OR @DeletedRows > 0
+--	BEGIN
+--	    DELETE TOP (500)
+--	    FROM LogMessages
+--	    WHERE LogDate < '2024-09-26'
+--	    SELECT @DeletedRows = @@ROWCOUNT;
+--	END;
+--	==================================================
 -- 5. LOCK GRANULARITY AND HIERARCHIES:
 --	+ The Database Engine provide lock granularity to identify which type of resources to be locked.
 --	+ There are multiple levels of granualarity (also called lock hierarchy):
@@ -76,14 +91,36 @@
 --		- concurrency ability: small granualarity restricts access to small part of table thus increase concurrency, higher granularity reduce concurrency.
 -- 6. LOCK MODES:
 --	+ The lock modes used to determine how the resource can be accessed:
---		- Shared (S): used for read operations such as SELECT statement.
---		- Update (U): used with UPLOCK hint on resources that can be updated, prevent deadlock might occur in SELECT then UPDATE format.
---		- Exclusive (X): used for data-modification operations, such as INSERT, UPDATE, or DELETE.
---		- Intent: used to establish a lock hierarchy by specifying a higher granularity level (usually TABLE), improve lock management
---			types of intent locks are: intent shared (IS), intent exclusive (IX), and shared with intent exclusive (SIX).
---		- Schema: schema modification (Sch-M) to prevent any operations on table, and schema stability (Sch-S) to prevent any schema modification.
+--		- Shared (S): used for read operations such as SELECT statement, no data modification allowed on Shared lock resource, but other S lock can be granted along side.
+--		- Update (U): used with UPLOCK hint to specify resources that can be updated, prevent deadlock might occur in SELECT then UPDATE format.
+--		- Exclusive (X): used for data-modification operations (such as INSERT, UPDATE, or DELETE), this prevent all concurrent operations to be perfomred, except READ operation used with NOLOCK hint or the READ UNCOMMITTED isolation level.
+--		- Intent: used to establish a lock hierarchy by specifying a higher granularity level (usually TABLE), improving lock management.
+--			* types of intent locks are: intent shared (IS), intent exclusive (IX), shared with intent exclusive (SIX), intent update (IU), shared intent update (SIU), update intent exclusive (UIX).
+--			* this lock helps the Database Engine to quickly detect lock conflicts at the higher level of granularity.
+--		- Schema modification (Sch-M): used when modifying schema, to prevent any operations on the table
+--		- Schema stability (Sch-S): used to prevent any schema modification.
 --		- Bulk Update (BU): used when bulk copying data into a table with the TABLOCK hint.
 --		- Key-range: protects the range of rows read by a query when using SERIALIZABLE transaction isolation level.
---	+ 
-
-
+-- 7. LOCK COMPATIBILITY:
+--	+ Lock compatibility controls whether multiple transactions can acquire locks on the same resource at the same time.
+--	+ A new lock to be granted must be compatible with all existing locks. If not the lock conflict ocurrs and the transaction forced to wait for all uncompatible locks to be released or timeout.
+--	+ Table of compaibility of most commonly encountered lock modes (Y-yes, N-no):
+--		S	U	X	IS	IX	SIX
+--	S	Y	Y	N	Y	N	N
+--	U	Y	N	N	Y	N	N
+--	X	N	N	N	N	N	N
+--	IS	Y	Y	N	Y	Y	Y
+--	IX	N	N	N	Y	Y	N
+--	SIX	N	N	N	Y	N	N
+-- 8. LOCK ESCALTION:
+--	+ Lock escalation is a process of converting many fine-grained locks into fewer coarse-grain locks.
+--	+ It helps to lower the number of locks, and hence reducing system overhead and improving concurrency.
+--	+ The process could be changing the intent lock on the table to the corresponding full lock (change IX lock to X lock), or escalate lower granularity lock to higer one (ex: escalate page lock to table lock).
+--	+ Each escalation event operates primarily at the level of a single T-SQL statement, which means an escalation event only estimates all locks acquired on the current statement and all previous statements within a transaction.
+--	+ If a lock escalation attempt fails because of conflicting locks held by other concurrent transactions, the Database Engine retries the lock escalation for each additional 1,250 locks acquired by the transaction.
+--	+ If a lock escaltion succeeds, any locks operated during the event will be escalated.
+--	+ With optimized locking, the number of locks acquired are reduced, and make the escalation occurs less frequently.
+--	+ Lock escalation thresholds: 
+--		* A lock escalation will ocurr if and only if a T-SQL statement has acquired at least 5,000 locks on a single reference of a table.
+--		* The Database Engine periodically checks for possible escalations at every 1,250 newly acuired locks.
+--	+ Monitor lock escalation by using the lock_escalation extended event.
