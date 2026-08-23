@@ -1,3 +1,53 @@
+﻿
+-- TRANSACTION LOCKING AND ROW VERSIONING
+
+-- 1. Transactions:
+--	+ A transaction is a logical unit of work consisting of one or more operations.
+--	+ Transactions must satisfy ACID properties:
+--		- Atomicity: all operations succeed or none are applied.
+--		- Consistency: ensures data integrity and adherence to constraints.
+--		- Isolation: concurrent transactions execute independently without interference.
+--		- Durability: once committed, changes persist even after system failures.
+--	+ Transaction types:
+--		- Explicit: defined with BEGIN TRANSACTION / COMMIT / ROLLBACK.
+--		- Implicit: engine automatically starts a new transaction after one finishes.
+--		- Batch-scoped: applies to all statements in a batch.
+--		- Distributed: span multiple databases/instances, coordinated by a transaction manager.
+--	+ Transactions end with COMMIT or ROLLBACK. Errors trigger automatic rollback unless handled with TRY...CATCH.
+
+-- 2. Concurrency Control:
+--	+ SQL Server uses locking and isolation levels to manage concurrent transactions.
+--	+ Without control, anomalies occur:
+--		- Lost updates: one update overwrites another.
+--		- Dirty reads: reading uncommitted changes.
+--		- Nonrepeatable reads: same row returns different values in one transaction.
+--		- Phantom reads: repeated queries return new rows inserted by other transactions.
+--	+ Concurrency models:
+--		- Pessimistic: locks resource to prevent conflicts; best for high contention.
+--		- Optimistic: reads without locks, checks for conflicts at update; best for low contention.
+
+-- 3. Transaction Isolation levels:
+--	+ Define how transactions interact with each other's changes.
+--	+ Control lock acquisition, duration, and behavior when encountering modified rows.
+--	+ Lower levels → more concurrency, more anomalies. Higher levels → fewer anomalies, more blocking.
+--	+ Levels:
+--		- READ UNCOMMITTED: allow dirty reads.
+--		- READ COMMITTED (default): prevents dirty reads; nonrepeatable and phantom reads possible.
+--		- REPEATABLE READ: prevents nonrepeatable reads; phantom reads possible.
+--		- SERIALIZABLE: highest isolation; prevents all anomalies.
+--		- RSCI (Read Committed Snapshot): statement-level consistency via row versioning.
+--		- SNAPSHOT: transaction-level consistency via row versioning.
+--	+ Side effects by level:
+--		- READ UNCOMMITTED: Dirty, Nonrepeatable, Phantom.
+--		- READ COMMITTED: nonrepeatable, Phantom.
+--		- REPEATABLE READ: Phantom.
+--		- SNAPSHOT / SERIALIZABLE: none.
+--	+ Set isolation level with: SET TRANSACTION ISOLATION LEVEL { ... }
+
+-- 4. Locking:
+--	+ Locks synchronize access to resources.
+--	+ If a requested lock conflicts, the transaction waits until it is released.
+
 
 -- TRANSACTION LOCKING AND ROW VERSIONING
 -- 1. TRANSACTION:
@@ -124,3 +174,119 @@
 --		* A lock escalation will ocurr if and only if a T-SQL statement has acquired at least 5,000 locks on a single reference of a table.
 --		* The Database Engine periodically checks for possible escalations at every 1,250 newly acuired locks.
 --	+ Monitor lock escalation by using the lock_escalation extended event.
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- TRANSACTION LOCKING AND ROW VERSIONING
+
+-- 1. Transactions:
+--    + A transaction is a logical unit of work consisting of one or more operations.
+--    + Transactions must satisfy ACID properties:
+--      - Atomicity: all operations succeed or none are applied.
+--      - Consistency: ensures data integrity and adherence to constraints.
+--      - Isolation: concurrent transactions execute independently without interference.
+--      - Durability: once committed, changes persist even after system failures.
+--    + Transaction types:
+--      - Explicit: defined with BEGIN TRANSACTION / COMMIT / ROLLBACK.
+--      - Implicit: engine automatically starts a new transaction after one finishes.
+--      - Autocommit: default mode; each statement is its own transaction.
+--      - Batch-scoped: applies to all statements in a batch.
+--      - Distributed: spans multiple databases/instances, coordinated by a transaction manager.
+--    + Transactions end with COMMIT or ROLLBACK. Errors trigger automatic rollback unless handled with TRY...CATCH.
+
+-- 2. Concurrency Control:
+--    + SQL Server uses locking and isolation levels to manage concurrent transactions.
+--    + Without control, anomalies occur:
+--      - Lost updates: one update overwrites another.
+--      - Dirty reads: reading uncommitted changes.
+--      - Nonrepeatable reads: same row returns different values in one transaction.
+--      - Phantom reads: repeated queries return new rows inserted by other transactions.
+--    + Concurrency models:
+--      - Pessimistic: locks resources to prevent conflicts; best for high contention.
+--      - Optimistic: reads without locks, checks for conflicts at update; best for low contention.
+
+-- 3. Transaction Isolation Levels:
+--    + Define how transactions interact with each other’s changes.
+--    + Control lock acquisition, duration, and behavior when encountering modified rows.
+--    + Lower levels → more concurrency, more anomalies. Higher levels → fewer anomalies, more blocking.
+--    + Levels:
+--      - READ UNCOMMITTED: allows dirty reads.
+--      - READ COMMITTED (default): prevents dirty reads; nonrepeatable and phantom reads possible.
+--      - REPEATABLE READ: prevents nonrepeatable reads; phantom reads possible.
+--      - SERIALIZABLE: highest isolation; prevents all anomalies.
+--      - RCSI (Read Committed Snapshot): statement-level consistency via row versioning.
+--      - SNAPSHOT: transaction-level consistency via row versioning.
+--    + Side effects by level:
+--      - READ UNCOMMITTED: Dirty, Nonrepeatable, Phantom.
+--      - READ COMMITTED: Nonrepeatable, Phantom.
+--      - REPEATABLE READ: Phantom.
+--      - SNAPSHOT / SERIALIZABLE: none.
+--    + Set isolation level with: SET TRANSACTION ISOLATION LEVEL { ... }
+
+-- 4. Locking:
+--    + Locks synchronize access to resources.
+--    + If a requested lock conflicts, the transaction waits until it is released.
+--    + Lock duration depends on isolation level and optimized locking settings.
+--    + All locks are released at transaction end.
+--    + Trade-off: fine-grained locks increase concurrency but add overhead; coarse locks reduce overhead but block more.
+--    + Best practices: minimize lock count, use snapshot isolation cautiously, batch updates/deletes to avoid escalation.
+--      Example: DELETE TOP (500) in a loop until @@ROWCOUNT = 0.
+
+-- 5. Lock Granularity & Hierarchy:
+--    + Lock levels:
+--      - RID: single row in heap.
+--      - KEY: single row in B-tree.
+--      - PAGE: 8 KB page.
+--      - EXTENT: 8 contiguous pages.
+--      - HoBT: heap or B-tree.
+--      - TABLE: entire table.
+--      - FILE: database file.
+--      - APPLICATION: user-defined resource.
+--      - METADATA: schema metadata.
+--      - ALLOCATION_UNIT: allocation unit.
+--      - DATABASE: entire database.
+--      - XACT: transaction ID (optimized locking).
+--    + Trade-off:
+--      - Small granularity → more locks, higher overhead, better concurrency.
+--      - Large granularity → fewer locks, lower overhead, reduced concurrency.
+
+-- 6. Lock Modes:
+--    + Define how resources can be accessed:
+--      - Shared (S): read-only; compatible with other S locks.
+--      - Update (U): prevents deadlocks in SELECT→UPDATE scenarios.
+--      - Exclusive (X): for modifications; blocks all except NOLOCK/READ UNCOMMITTED.
+--      - Intent (IS, IX, SIX, IU, SIU, UIX): indicate intention to lock at finer granularity.
+--      - Schema (Sch-M, Sch-S): protect schema changes or stability.
+--      - Bulk Update (BU): used with TABLOCK during bulk insert.
+--      - Key-range: protects ranges in SERIALIZABLE isolation.
+
+-- 7. Lock Compatibility:
+--    + Determines if multiple locks can coexist on the same resource.
+--    + Example compatibility matrix (Y=yes, N=no):
+--      S  U  X  IS IX SIX
+--      S  Y  Y  N  Y  N  N
+--      U  Y  N  N  Y  N  N
+--      X  N  N  N  N  N  N
+--      IS Y  Y  N  Y  Y  Y
+--      IX N  N  N  Y  Y  N
+--      SIX N  N  N  Y  N  N
+
+-- 8. Lock Escalation:
+--    + Converts many fine-grained locks into fewer coarse locks.
+--    + Reduces overhead but lowers concurrency.
+--    + Escalation examples: IX → X at table level, page locks → table lock.
+--    + Triggered when a statement acquires ≥5,000 locks on a table.
+--    + Engine checks for escalation every 1,250 new locks.
+--    + If escalation fails due to conflicts, retries after each 1,250 locks.
+--    + Optimized locking reduces escalation frequency.
+--    + Monitor escalation with lock_escalation extended event.
